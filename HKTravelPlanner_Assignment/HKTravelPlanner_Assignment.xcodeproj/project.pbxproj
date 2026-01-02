@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		8C212CF62F05161600949C2B /* HKTravelPlanner_Assignment.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HKTravelPlanner_Assignment.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C212D482F06F69900949C2B /* HKTravelPlanner_Assignment.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HKTravelPlanner_Assignment.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		8C212CF82F05161600949C2B /* HKTravelPlanner_Assignment */ = {
+		8C212D4A2F06F69900949C2B /* HKTravelPlanner_Assignment */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = HKTravelPlanner_Assignment;
 			sourceTree = "<group>";
@@ -19,7 +19,7 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		8C212CF32F05161600949C2B /* Frameworks */ = {
+		8C212D452F06F69900949C2B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -29,18 +29,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		8C212CED2F05161600949C2B = {
+		8C212D3F2F06F69900949C2B = {
 			isa = PBXGroup;
 			children = (
-				8C212CF82F05161600949C2B /* HKTravelPlanner_Assignment */,
-				8C212CF72F05161600949C2B /* Products */,
+				8C212D4A2F06F69900949C2B /* HKTravelPlanner_Assignment */,
+				8C212D492F06F69900949C2B /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		8C212CF72F05161600949C2B /* Products */ = {
+		8C212D492F06F69900949C2B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8C212CF62F05161600949C2B /* HKTravelPlanner_Assignment.app */,
+				8C212D482F06F69900949C2B /* HKTravelPlanner_Assignment.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,64 +48,64 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8C212CF52F05161600949C2B /* HKTravelPlanner_Assignment */ = {
+		8C212D472F06F69900949C2B /* HKTravelPlanner_Assignment */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8C212D012F05161700949C2B /* Build configuration list for PBXNativeTarget "HKTravelPlanner_Assignment" */;
+			buildConfigurationList = 8C212D532F06F69B00949C2B /* Build configuration list for PBXNativeTarget "HKTravelPlanner_Assignment" */;
 			buildPhases = (
-				8C212CF22F05161600949C2B /* Sources */,
-				8C212CF32F05161600949C2B /* Frameworks */,
-				8C212CF42F05161600949C2B /* Resources */,
+				8C212D442F06F69900949C2B /* Sources */,
+				8C212D452F06F69900949C2B /* Frameworks */,
+				8C212D462F06F69900949C2B /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				8C212CF82F05161600949C2B /* HKTravelPlanner_Assignment */,
+				8C212D4A2F06F69900949C2B /* HKTravelPlanner_Assignment */,
 			);
 			name = HKTravelPlanner_Assignment;
 			packageProductDependencies = (
 			);
 			productName = HKTravelPlanner_Assignment;
-			productReference = 8C212CF62F05161600949C2B /* HKTravelPlanner_Assignment.app */;
+			productReference = 8C212D482F06F69900949C2B /* HKTravelPlanner_Assignment.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		8C212CEE2F05161600949C2B /* Project object */ = {
+		8C212D402F06F69900949C2B /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					8C212CF52F05161600949C2B = {
+					8C212D472F06F69900949C2B = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
-			buildConfigurationList = 8C212CF12F05161600949C2B /* Build configuration list for PBXProject "HKTravelPlanner_Assignment" */;
+			buildConfigurationList = 8C212D432F06F69900949C2B /* Build configuration list for PBXProject "HKTravelPlanner_Assignment" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = 8C212CED2F05161600949C2B;
+			mainGroup = 8C212D3F2F06F69900949C2B;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 8C212CF72F05161600949C2B /* Products */;
+			productRefGroup = 8C212D492F06F69900949C2B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8C212CF52F05161600949C2B /* HKTravelPlanner_Assignment */,
+				8C212D472F06F69900949C2B /* HKTravelPlanner_Assignment */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		8C212CF42F05161600949C2B /* Resources */ = {
+		8C212D462F06F69900949C2B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -115,7 +115,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		8C212CF22F05161600949C2B /* Sources */ = {
+		8C212D442F06F69900949C2B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -125,7 +125,7 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		8C212CFF2F05161700949C2B /* Debug */ = {
+		8C212D512F06F69B00949C2B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -188,7 +188,7 @@
 			};
 			name = Debug;
 		};
-		8C212D002F05161700949C2B /* Release */ = {
+		8C212D522F06F69B00949C2B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -244,7 +244,7 @@
 			};
 			name = Release;
 		};
-		8C212D022F05161700949C2B /* Debug */ = {
+		8C212D542F06F69B00949C2B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -275,7 +275,7 @@
 			};
 			name = Debug;
 		};
-		8C212D032F05161700949C2B /* Release */ = {
+		8C212D552F06F69B00949C2B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -309,25 +309,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		8C212CF12F05161600949C2B /* Build configuration list for PBXProject "HKTravelPlanner_Assignment" */ = {
+		8C212D432F06F69900949C2B /* Build configuration list for PBXProject "HKTravelPlanner_Assignment" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8C212CFF2F05161700949C2B /* Debug */,
-				8C212D002F05161700949C2B /* Release */,
+				8C212D512F06F69B00949C2B /* Debug */,
+				8C212D522F06F69B00949C2B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8C212D012F05161700949C2B /* Build configuration list for PBXNativeTarget "HKTravelPlanner_Assignment" */ = {
+		8C212D532F06F69B00949C2B /* Build configuration list for PBXNativeTarget "HKTravelPlanner_Assignment" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8C212D022F05161700949C2B /* Debug */,
-				8C212D032F05161700949C2B /* Release */,
+				8C212D542F06F69B00949C2B /* Debug */,
+				8C212D552F06F69B00949C2B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 8C212CEE2F05161600949C2B /* Project object */;
+	rootObject = 8C212D402F06F69900949C2B /* Project object */;
 }
