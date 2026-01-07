@@ -13,17 +13,19 @@ import Combine
 struct MapView: View {
     @ObservedObject var travelDataManager = TravelDataManager.shared
     @StateObject private var locationManager = LocationManager()
+    
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
+    
     @State private var selectedLocation: Location?
     @State private var searchText = ""
-    @State private var showSearchResults = false
     @State private var searchResults: [MKMapItem] = []
     @State private var showLocationAlert = false
     @State private var locationAlertMessage = ""
     @State private var isLocationAvailable = false
+    @State private var showUserLocation = false
     
     var body: some View {
         ZStack {
@@ -31,9 +33,13 @@ struct MapView: View {
             Map(
                 coordinateRegion: $region,
                 interactionModes: .all,
-                showsUserLocation: true,
-                userTrackingMode: .constant(isLocationAvailable ? .follow : .none)
-            )
+                showsUserLocation: showUserLocation,
+                annotationItems: travelDataManager.locations
+            ) { location in
+                MapAnnotation(coordinate: location.coordinate) {
+                    MapMarker(location: location, selectedLocation: $selectedLocation)
+                }
+            }
             .mapStyle(.standard)
             .edgesIgnoringSafeArea(.top)
             
@@ -57,7 +63,6 @@ struct MapView: View {
                                 Button(action: {
                                     searchText = ""
                                     searchResults = []
-                                    showSearchResults = false
                                 }) {
                                     Image(systemName: "xmark.circle.fill")
                                         .foregroundColor(.gray)
@@ -120,22 +125,9 @@ struct MapView: View {
                                     .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
                             }
                             
-                            // Map Type Toggle
+                            // Zoom to Hong Kong Button
                             Button(action: {
-                                // Toggle map style (not fully implemented in iOS 15-16 Map)
-                            }) {
-                                Image(systemName: "map")
-                                    .font(.title2)
-                                    .frame(width: 50, height: 50)
-                                    .background(Color.white)
-                                    .foregroundColor(.hkBlue)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
-                            }
-                            
-                            // Nearby Places
-                            Button(action: {
-                                showNearbyPlaces()
+                                centerOnHongKong()
                             }) {
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.title2)
@@ -156,25 +148,26 @@ struct MapView: View {
         .navigationBarHidden(true)
         .onAppear {
             locationManager.requestPermission()
+            
+            // For simulator testing, show Hong Kong immediately
+            #if targetEnvironment(simulator)
+            centerOnHongKong()
+            #endif
         }
         .onReceive(locationManager.$userLocation) { newLocation in
-            if let location = newLocation, !isLocationAvailable {
-                // First time getting location
-                withAnimation {
-                    region.center = location.coordinate
-                    region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-                    isLocationAvailable = true
-                }
-            }
-        }
-        .onReceive(locationManager.$locationError) { error in
-            if let error = error {
-                showLocationAlert = true
-                locationAlertMessage = error
+            if let location = newLocation {
+                updateMapToLocation(location.coordinate)
+                isLocationAvailable = true
+                showUserLocation = true
             }
         }
         .alert("位置服務", isPresented: $showLocationAlert) {
             Button("OK") {}
+            Button("設定") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
         } message: {
             Text(locationAlertMessage)
         }
@@ -182,16 +175,27 @@ struct MapView: View {
     
     private func centerOnUserLocation() {
         if let userLocation = locationManager.userLocation {
-            withAnimation {
-                region.center = userLocation.coordinate
-                region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-            }
-        } else if !locationManager.isLocationAuthorized {
-            locationAlertMessage = "位置服務未啟用。請前往設定 > 隱私權 > 定位服務中啟用。"
-            showLocationAlert = true
+            updateMapToLocation(userLocation.coordinate)
         } else {
-            locationAlertMessage = "正在取得位置資訊..."
-            showLocationAlert = true
+            if locationManager.isLocationAuthorized {
+                locationAlertMessage = "正在取得您的位置..."
+                showLocationAlert = true
+            } else {
+                locationAlertMessage = "請啟用位置服務以使用此功能"
+                showLocationAlert = true
+            }
+        }
+    }
+    
+    private func centerOnHongKong() {
+        let hongKongCoordinate = CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694)
+        updateMapToLocation(hongKongCoordinate)
+    }
+    
+    private func updateMapToLocation(_ coordinate: CLLocationCoordinate2D) {
+        withAnimation {
+            region.center = coordinate
+            region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
         }
     }
     
@@ -200,38 +204,33 @@ struct MapView: View {
         
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = searchText
-        request.region = region
+        
+        // Use Hong Kong as default region for search
+        request.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694),
+            span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
+        )
         
         let search = MKLocalSearch(request: request)
         search.start { response, error in
             DispatchQueue.main.async {
-                if let response = response {
-                    searchResults = response.mapItems
-                    showSearchResults = true
+                if let response = response, let firstResult = response.mapItems.first {
+                    updateMapToLocation(firstResult.placemark.coordinate)
                     
-                    // Move map to first result
-                    if let firstResult = response.mapItems.first {
-                        withAnimation {
-                            region.center = firstResult.placemark.coordinate
-                            region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-                        }
-                    }
+                    let newLocation = Location(
+                        name: firstResult.name ?? "未知地點",
+                        address: firstResult.placemark.title ?? "未知地址",
+                        latitude: firstResult.placemark.coordinate.latitude,
+                        longitude: firstResult.placemark.coordinate.longitude,
+                        category: "Search Result"
+                    )
+                    
+                    selectedLocation = newLocation
                 } else if let error = error {
                     locationAlertMessage = "搜尋失敗: \(error.localizedDescription)"
                     showLocationAlert = true
                 }
             }
-        }
-    }
-    
-    private func showNearbyPlaces() {
-        if let userLocation = locationManager.userLocation {
-            withAnimation {
-                region.center = userLocation.coordinate
-                region.span = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            }
-        } else {
-            centerOnUserLocation()
         }
     }
 }
@@ -253,31 +252,22 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func requestPermission() {
         switch locationManager.authorizationStatus {
         case .notDetermined:
-            locationManager.requestWhenInUseAuthorization()  // ← This only requests permission
+            locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
             isLocationAuthorized = true
-            locationManager.startUpdatingLocation()  // ← This starts tracking
+            locationManager.startUpdatingLocation()
         case .denied, .restricted:
             isLocationAuthorized = false
-            locationError = "位置服務已停用。請前往設定啟用。"
+            locationError = "位置服務已停用。請前往設定 > 隱私權 > 定位服務中啟用。"
         @unknown default:
             break
         }
     }
     
-    func startUpdating() {
-        if isLocationAuthorized {
-            locationManager.startUpdatingLocation()
-        }
-    }
-    
-    func stopUpdating() {
-        locationManager.stopUpdatingLocation()
-    }
-    
     // MARK: - CLLocationManagerDelegate
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        
         DispatchQueue.main.async {
             self.userLocation = location
             self.locationError = nil
@@ -290,11 +280,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             case .authorizedWhenInUse, .authorizedAlways:
                 self.isLocationAuthorized = true
                 self.locationError = nil
-                self.locationManager.startUpdatingLocation()
+                manager.startUpdatingLocation()
             case .denied, .restricted:
                 self.isLocationAuthorized = false
                 self.locationError = "位置服務已停用。請前往設定啟用。"
-                self.stopUpdating()
+                manager.stopUpdatingLocation()
             case .notDetermined:
                 self.isLocationAuthorized = false
             @unknown default:
@@ -310,7 +300,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 }
 
-// MARK: - Other supporting views (unchanged)
+// MARK: - Supporting Views
 
 struct MapMarker: View {
     let location: Location
@@ -347,12 +337,12 @@ struct MapMarker: View {
     }
 }
 
+// ADD THIS STRUCT - LocationDetailSheet
 struct LocationDetailSheet: View {
     let location: Location
     let onClose: () -> Void
     
     @State private var isFavorite: Bool
-    @State private var showDirections = false
     
     init(location: Location, onClose: @escaping () -> Void) {
         self.location = location
@@ -464,6 +454,7 @@ struct LocationDetailSheet: View {
         TravelDataManager.shared.updateFavoriteStatus(for: location.id, isFavorite: isFavorite)
     }
     
+    // Helper functions for category icons and colors
     private func iconForCategory(_ category: String) -> String {
         switch category {
         case "Transport Hub": return "train.side.front.car"
