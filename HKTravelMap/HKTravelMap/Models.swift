@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreLocation
 
 // MARK: - Data Models
 struct Location: Identifiable, Codable, Equatable {
@@ -18,6 +19,10 @@ struct Location: Identifiable, Codable, Equatable {
     var longitude: Double = 0.0
     var isFavorite: Bool = false
     var category: String = "Other"
+    
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
     
     static func == (lhs: Location, rhs: Location) -> Bool {
         lhs.id == rhs.id
@@ -85,19 +90,22 @@ class TravelDataManager: ObservableObject {
     @Published var weatherError: String?
     
     @Published var locations: [Location] = [
+        // Hong Kong Island
+        Location(
+            name: "Central MTR Station",
+            address: "Central, Hong Kong Island",
+            latitude: 22.2819,
+            longitude: 114.1586,
+            isFavorite: true,
+            category: "Transport Hub"
+        ),
         Location(
             name: "Times Square, Causeway Bay",
             address: "1 Matheson Street, Causeway Bay, Hong Kong",
             latitude: 22.2804,
             longitude: 114.1830,
+            isFavorite: true,
             category: "Shopping"
-        ),
-        Location(
-            name: "Central MTR Station",
-            address: "Central, Hong Kong",
-            latitude: 22.2819,
-            longitude: 114.1586,
-            category: "Transport Hub"
         ),
         Location(
             name: "Hong Kong Convention Centre",
@@ -107,8 +115,31 @@ class TravelDataManager: ObservableObject {
             category: "Entertainment"
         ),
         Location(
+            name: "Victoria Peak Tram",
+            address: "33 Garden Road, Central, Hong Kong",
+            latitude: 22.2744,
+            longitude: 114.1528,
+            category: "Entertainment"
+        ),
+        Location(
+            name: "Ocean Park",
+            address: "Wong Chuk Hang, Hong Kong Island",
+            latitude: 22.2456,
+            longitude: 114.1744,
+            category: "Entertainment"
+        ),
+        
+        // Kowloon
+        Location(
+            name: "Tsim Sha Tsui MTR Station",
+            address: "Tsim Sha Tsui, Kowloon",
+            latitude: 22.2970,
+            longitude: 114.1715,
+            category: "Transport Hub"
+        ),
+        Location(
             name: "Langham Place, Mong Kok",
-            address: "8 Argyle Street, Mong Kok, Hong Kong",
+            address: "8 Argyle Street, Mong Kok, Kowloon",
             latitude: 22.3175,
             longitude: 114.1694,
             isFavorite: true,
@@ -116,10 +147,59 @@ class TravelDataManager: ObservableObject {
         ),
         Location(
             name: "Star Ferry Pier, Tsim Sha Tsui",
-            address: "Tsim Sha Tsui, Hong Kong",
+            address: "Tsim Sha Tsui, Kowloon",
             latitude: 22.2935,
             longitude: 114.1689,
             category: "Transport Hub"
+        ),
+        Location(
+            name: "Kowloon Park",
+            address: "22 Austin Road, Tsim Sha Tsui, Kowloon",
+            latitude: 22.3008,
+            longitude: 114.1705,
+            category: "Entertainment"
+        ),
+        
+        // New Territories
+        Location(
+            name: "Shatin New Town Plaza",
+            address: "18 Sha Tin Centre Street, Sha Tin, New Territories",
+            latitude: 22.3792,
+            longitude: 114.1869,
+            category: "Shopping"
+        ),
+        Location(
+            name: "Hong Kong Science Park",
+            address: "Science Park East Avenue, Sha Tin, New Territories",
+            latitude: 22.4264,
+            longitude: 114.2125,
+            category: "Entertainment"
+        ),
+        
+        // Airport
+        Location(
+            name: "Hong Kong International Airport",
+            address: "Chek Lap Kok, Lantau Island",
+            latitude: 22.3080,
+            longitude: 113.9185,
+            category: "Transport Hub"
+        ),
+        
+        // Dining Locations
+        Location(
+            name: "Maxim's Palace Chinese Restaurant",
+            address: "2/F, City Hall Low Block, Central, Hong Kong",
+            latitude: 22.2820,
+            longitude: 114.1600,
+            category: "Dining"
+        ),
+        Location(
+            name: "Tim Ho Wan (Dim Sum)",
+            address: "Shop 12A, Hong Kong Station, Central",
+            latitude: 22.2847,
+            longitude: 114.1592,
+            isFavorite: true,
+            category: "Dining"
         )
     ]
     
@@ -155,6 +235,43 @@ class TravelDataManager: ObservableObject {
                 )
             ],
             weatherImpact: "Good weather, recommended walking"
+        ),
+        TravelRoute(
+            startLocation: Location(
+                name: "Causeway Bay",
+                address: "Times Square, Causeway Bay",
+                category: "Shopping"
+            ),
+            endLocation: Location(
+                name: "Mong Kok",
+                address: "Langham Place, Mong Kok",
+                category: "Shopping"
+            ),
+            departureTime: Date().addingTimeInterval(-7200),
+            estimatedArrivalTime: Date().addingTimeInterval(-6600),
+            duration: 45,
+            transportationModes: ["MTR", "Walk"],
+            steps: [
+                RouteStep(
+                    instruction: "Walk to Causeway Bay Station",
+                    transportMode: "Walk",
+                    duration: 8,
+                    distance: 0.5
+                ),
+                RouteStep(
+                    instruction: "Take Island Line to Admiralty",
+                    transportMode: "MTR",
+                    duration: 5,
+                    lineNumber: "Island Line"
+                ),
+                RouteStep(
+                    instruction: "Transfer to Tsuen Wan Line to Mong Kok",
+                    transportMode: "MTR",
+                    duration: 15,
+                    lineNumber: "Tsuen Wan Line"
+                )
+            ],
+            weatherImpact: "Light rain expected, bring umbrella"
         )
     ]
     
@@ -227,6 +344,16 @@ class TravelDataManager: ObservableObject {
                 weatherImpact: "Light rain expected, bring umbrella"
             )
         ]
+    }
+    
+    func getNearbyLocations(from coordinate: CLLocationCoordinate2D, radius: Double = 5.0) -> [Location] {
+        let userLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        
+        return locations.filter { location in
+            let locationPoint = CLLocation(latitude: location.latitude, longitude: location.longitude)
+            let distance = userLocation.distance(from: locationPoint) / 1000 // Convert to kilometers
+            return distance <= radius
+        }
     }
 }
 

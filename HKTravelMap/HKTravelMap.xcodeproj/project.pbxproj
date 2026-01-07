@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		8C802C252F0D864D0092FA32 /* HKTravelMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HKTravelMap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CEF4E732F0EAAFD00F04D31 /* HKTravelMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = HKTravelMap.app; path = "/Users/rexau/Desktop/HD/VT6002CEM/PSSApp/HKTravelMap/build/Debug-iphoneos/HKTravelMap.app"; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,16 +33,7 @@
 			isa = PBXGroup;
 			children = (
 				8C802C272F0D864D0092FA32 /* HKTravelMap */,
-				8C802C262F0D864D0092FA32 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		8C802C262F0D864D0092FA32 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				8C802C252F0D864D0092FA32 /* HKTravelMap.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -67,7 +58,7 @@
 			packageProductDependencies = (
 			);
 			productName = HKTravelMap;
-			productReference = 8C802C252F0D864D0092FA32 /* HKTravelMap.app */;
+			productReference = 8CEF4E732F0EAAFD00F04D31 /* HKTravelMap.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -95,7 +86,7 @@
 			mainGroup = 8C802C1C2F0D864D0092FA32;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 8C802C262F0D864D0092FA32 /* Products */;
+			productRefGroup = 8C802C1C2F0D864D0092FA32;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -253,6 +244,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -284,6 +277,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
