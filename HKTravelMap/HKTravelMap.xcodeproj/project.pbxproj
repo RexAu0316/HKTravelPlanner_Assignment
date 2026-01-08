@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		8CEF4E732F0EAAFD00F04D31 /* HKTravelMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = HKTravelMap.app; path = "/Users/rexau/Desktop/HD/VT6002CEM/PSSApp/HKTravelMap/build/Debug-iphoneos/HKTravelMap.app"; sourceTree = "<absolute>"; };
+		8CEF4E772F0EF9DE00F04D31 /* HKTravelMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HKTravelMap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +33,7 @@
 			isa = PBXGroup;
 			children = (
 				8C802C272F0D864D0092FA32 /* HKTravelMap */,
+				8CEF4E772F0EF9DE00F04D31 /* HKTravelMap.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,7 +59,7 @@
 			packageProductDependencies = (
 			);
 			productName = HKTravelMap;
-			productReference = 8CEF4E732F0EAAFD00F04D31 /* HKTravelMap.app */;
+			productReference = 8CEF4E772F0EF9DE00F04D31 /* HKTravelMap.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -244,8 +245,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "此應用需要您的位置以提供後台路線更新服務";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "此應用需要您的位置以提供路線規劃和地圖顯示功能";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -277,8 +278,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to your location to show you on the map and provide navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "此應用需要您的位置以提供後台路線更新服務";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "此應用需要您的位置以提供路線規劃和地圖顯示功能";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

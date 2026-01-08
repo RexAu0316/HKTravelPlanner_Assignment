@@ -1,19 +1,13 @@
-//
-//  MapView.swift
-//  HKTravelMap
-//
-//  Created by Rex Au on 7/1/2026.
-//
-
+// MapView.swift - 简单直接的用户定位版本
 import SwiftUI
 import MapKit
 import CoreLocation
-import Combine
 
 struct MapView: View {
+    @StateObject private var locationManager = LocationManager.shared
     @ObservedObject var travelDataManager = TravelDataManager.shared
-    @StateObject private var locationManager = LocationManager()
     
+    // 地图区域状态
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
@@ -21,19 +15,15 @@ struct MapView: View {
     
     @State private var selectedLocation: Location?
     @State private var searchText = ""
-    @State private var searchResults: [MKMapItem] = []
-    @State private var showLocationAlert = false
-    @State private var locationAlertMessage = ""
-    @State private var isLocationAvailable = false
-    @State private var showUserLocation = false
     
     var body: some View {
         ZStack {
-            // Main Map View
+            // 1. 核心地图视图
             Map(
                 coordinateRegion: $region,
                 interactionModes: .all,
-                showsUserLocation: showUserLocation,
+                showsUserLocation: true,
+                userTrackingMode: .constant(.none),
                 annotationItems: travelDataManager.locations
             ) { location in
                 MapAnnotation(coordinate: location.coordinate) {
@@ -43,265 +33,229 @@ struct MapView: View {
             .mapStyle(.standard)
             .edgesIgnoringSafeArea(.top)
             
-            // Overlay UI Elements
-            VStack(spacing: 0) {
-                // Top Search Bar
-                VStack(spacing: 0) {
+            // 2. 简单的UI覆盖层
+            VStack {
+                // 顶部搜索栏
+                HStack {
                     HStack {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
-                                .padding(.leading, 8)
-                            
-                            TextField("搜尋地點或地址", text: $searchText)
-                                .padding(.vertical, 10)
-                                .onSubmit {
-                                    performSearch()
-                                }
-                            
-                            if !searchText.isEmpty {
-                                Button(action: {
-                                    searchText = ""
-                                    searchResults = []
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.gray)
-                                        .padding(.trailing, 8)
-                                }
-                            }
-                        }
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
                         
-                        Button(action: {
-                            performSearch()
-                        }) {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.hkBlue)
-                        }
-                        .disabled(searchText.isEmpty)
+                        TextField("搜尋地點", text: $searchText)
+                            .padding(.vertical, 8)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 60)
+                    .padding(.horizontal, 10)
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .shadow(radius: 2)
+                    
+                    if !searchText.isEmpty {
+                        Button("搜尋") {
+                            searchLocation()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.hkBlue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
                 }
-                .background(
-                    LinearGradient(
-                        colors: [Color.black.opacity(0.2), Color.clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .edgesIgnoringSafeArea(.top)
-                )
+                .padding(.horizontal)
+                .padding(.top, 60)
                 
                 Spacer()
                 
-                // Bottom Controls
-                VStack(spacing: 20) {
-                    // Location Details Sheet
-                    if let location = selectedLocation {
-                        LocationDetailSheet(location: location) {
-                            selectedLocation = nil
-                        }
-                        .transition(.move(edge: .bottom))
-                    }
+                // 底部按钮
+                HStack {
+                    Spacer()
                     
-                    // Control Buttons
-                    HStack {
-                        Spacer()
-                        
-                        VStack(spacing: 15) {
-                            // Current Location Button
-                            Button(action: {
-                                centerOnUserLocation()
-                            }) {
-                                Image(systemName: locationManager.isLocationAuthorized ? "location.fill" : "location.slash.fill")
-                                    .font(.title2)
+                    VStack(spacing: 15) {
+                        // 定位按钮 - 核心功能
+                        Button(action: {
+                            locateUserNow()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
                                     .frame(width: 50, height: 50)
-                                    .background(Color.white)
-                                    .foregroundColor(locationManager.isLocationAuthorized ? .hkBlue : .gray)
-                                    .clipShape(Circle())
                                     .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                                
+                                Image(systemName: "location.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.hkBlue)
                             }
-                            
-                            // Zoom to Hong Kong Button
-                            Button(action: {
-                                centerOnHongKong()
-                            }) {
+                        }
+                        
+                        // 香港按钮
+                        Button(action: {
+                            centerOnHongKong()
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 50, height: 50)
+                                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                                
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.title2)
-                                    .frame(width: 50, height: 50)
-                                    .background(Color.white)
                                     .foregroundColor(.hkRed)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
                             }
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
                     }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 30)
                 }
             }
         }
         .navigationTitle("地圖")
         .navigationBarHidden(true)
         .onAppear {
+            // 应用启动时立即尝试定位
+            locateUserOnAppear()
+        }
+    }
+    
+    // MARK: - 核心定位函数
+    
+    /// 应用启动时定位用户
+    private func locateUserOnAppear() {
+        print("🗺️ 应用启动，开始定位...")
+        
+        // 检查位置服务是否可用
+        guard CLLocationManager.locationServicesEnabled() else {
+            print("❌ 位置服务未启用")
+            return
+        }
+        
+        // 检查当前授权状态
+        let status = locationManager.authorizationStatus
+        print("🗺️ 当前授权状态: \(status.rawValue)")
+        
+        switch status {
+        case .notDetermined:
+            // 首次使用，请求权限
+            print("🗺️ 请求位置权限")
             locationManager.requestPermission()
             
-            // For simulator testing, show Hong Kong immediately
-            #if targetEnvironment(simulator)
-            centerOnHongKong()
-            #endif
-        }
-        .onReceive(locationManager.$userLocation) { newLocation in
-            if let location = newLocation {
-                updateMapToLocation(location.coordinate)
-                isLocationAvailable = true
-                showUserLocation = true
-            }
-        }
-        .alert("位置服務", isPresented: $showLocationAlert) {
-            Button("OK") {}
-            Button("設定") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            }
-        } message: {
-            Text(locationAlertMessage)
-        }
-    }
-    
-    private func centerOnUserLocation() {
-        if let userLocation = locationManager.userLocation {
-            updateMapToLocation(userLocation.coordinate)
-        } else {
-            if locationManager.isLocationAuthorized {
-                locationAlertMessage = "正在取得您的位置..."
-                showLocationAlert = true
-            } else {
-                locationAlertMessage = "請啟用位置服務以使用此功能"
-                showLocationAlert = true
-            }
-        }
-    }
-    
-    private func centerOnHongKong() {
-        let hongKongCoordinate = CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694)
-        updateMapToLocation(hongKongCoordinate)
-    }
-    
-    private func updateMapToLocation(_ coordinate: CLLocationCoordinate2D) {
-        withAnimation {
-            region.center = coordinate
-            region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-        }
-    }
-    
-    private func performSearch() {
-        guard !searchText.isEmpty else { return }
-        
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = searchText
-        
-        // Use Hong Kong as default region for search
-        request.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694),
-            span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
-        )
-        
-        let search = MKLocalSearch(request: request)
-        search.start { response, error in
-            DispatchQueue.main.async {
-                if let response = response, let firstResult = response.mapItems.first {
-                    updateMapToLocation(firstResult.placemark.coordinate)
-                    
-                    let newLocation = Location(
-                        name: firstResult.name ?? "未知地點",
-                        address: firstResult.placemark.title ?? "未知地址",
-                        latitude: firstResult.placemark.coordinate.latitude,
-                        longitude: firstResult.placemark.coordinate.longitude,
-                        category: "Search Result"
-                    )
-                    
-                    selectedLocation = newLocation
-                } else if let error = error {
-                    locationAlertMessage = "搜尋失敗: \(error.localizedDescription)"
-                    showLocationAlert = true
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Location Manager
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    private let locationManager = CLLocationManager()
-    
-    @Published var userLocation: CLLocation?
-    @Published var isLocationAuthorized = false
-    @Published var locationError: String?
-    
-    override init() {
-        super.init()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-    }
-    
-    func requestPermission() {
-        switch locationManager.authorizationStatus {
-        case .notDetermined:
-            locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
-            isLocationAuthorized = true
+            // 已有权限，开始定位
+            print("🗺️ 已有权限，开始更新位置")
             locationManager.startUpdatingLocation()
+            
+            // 如果已经有位置，立即居中
+            if let userLocation = locationManager.userLocation {
+                print("🗺️ 已有位置，立即居中")
+                centerOnLocation(userLocation.coordinate)
+            } else {
+                // 等待位置更新
+                print("🗺️ 等待位置更新...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if let userLocation = locationManager.userLocation {
+                        centerOnLocation(userLocation.coordinate)
+                    } else {
+                        print("❌ 2秒后仍未获取到位置")
+                    }
+                }
+            }
+            
         case .denied, .restricted:
-            isLocationAuthorized = false
-            locationError = "位置服務已停用。請前往設定 > 隱私權 > 定位服務中啟用。"
+            print("❌ 位置权限被拒绝")
+            // 显示香港作为默认位置
+            
         @unknown default:
             break
         }
     }
     
-    // MARK: - CLLocationManagerDelegate
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
+    /// 点击定位按钮时调用
+    private func locateUserNow() {
+        print("📍 用户点击定位按钮")
         
-        DispatchQueue.main.async {
-            self.userLocation = location
-            self.locationError = nil
-        }
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        DispatchQueue.main.async {
-            switch status {
-            case .authorizedWhenInUse, .authorizedAlways:
-                self.isLocationAuthorized = true
-                self.locationError = nil
-                manager.startUpdatingLocation()
-            case .denied, .restricted:
-                self.isLocationAuthorized = false
-                self.locationError = "位置服務已停用。請前往設定啟用。"
-                manager.stopUpdatingLocation()
-            case .notDetermined:
-                self.isLocationAuthorized = false
-            @unknown default:
-                break
+        let status = locationManager.authorizationStatus
+        
+        switch status {
+        case .notDetermined:
+            // 请求权限
+            locationManager.requestPermission()
+            
+        case .authorizedWhenInUse, .authorizedAlways:
+            // 确保位置更新已启动
+            locationManager.startUpdatingLocation()
+            
+            // 尝试获取当前位置
+            if let userLocation = locationManager.userLocation {
+                print("📍 成功获取位置，居中显示")
+                centerOnLocation(userLocation.coordinate)
+            } else {
+                print("📍 等待获取位置...")
+                
+                // 等待3秒获取位置
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    if let userLocation = locationManager.userLocation {
+                        centerOnLocation(userLocation.coordinate)
+                    } else {
+                        print("❌ 3秒后仍未获取到位置")
+                    }
+                }
             }
+            
+        case .denied, .restricted:
+            print("❌ 用户已拒绝位置权限")
+            
+        @unknown default:
+            break
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        DispatchQueue.main.async {
-            self.locationError = "取得位置失敗: \(error.localizedDescription)"
+    /// 居中到香港
+    private func centerOnHongKong() {
+        print("🇭🇰 居中到香港")
+        let hongKongCoordinate = CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694)
+        centerOnLocation(hongKongCoordinate)
+    }
+    
+    /// 通用的位置居中函数
+    private func centerOnLocation(_ coordinate: CLLocationCoordinate2D) {
+        print("📍 移动地图到坐标: \(coordinate.latitude), \(coordinate.longitude)")
+        
+        withAnimation(.easeInOut(duration: 0.5)) {
+            region.center = coordinate
+            region.span = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+        }
+    }
+    
+    /// 搜索地点
+    private func searchLocation() {
+        guard !searchText.isEmpty else { return }
+        
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchText
+        request.region = region
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            DispatchQueue.main.async {
+                if let response = response, let firstResult = response.mapItems.first {
+                    // 移动到搜索结果
+                    centerOnLocation(firstResult.placemark.coordinate)
+                    
+                    // 创建位置对象
+                    let newLocation = Location(
+                        name: firstResult.name ?? "未知地點",
+                        address: firstResult.placemark.title ?? "未知地址",
+                        latitude: firstResult.placemark.coordinate.latitude,
+                        longitude: firstResult.placemark.coordinate.longitude,
+                        category: "搜索結果"
+                    )
+                    
+                    selectedLocation = newLocation
+                }
+            }
         }
     }
 }
 
-// MARK: - Supporting Views
-
+// MARK: - 地图标记视图
 struct MapMarker: View {
     let location: Location
     @Binding var selectedLocation: Location?
@@ -317,7 +271,7 @@ struct MapMarker: View {
                     Circle()
                         .fill(Color.white)
                         .frame(width: 36, height: 36)
-                        .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                        .shadow(radius: 3)
                     
                     Image(systemName: location.isFavorite ? "star.fill" : "mappin.circle.fill")
                         .font(.system(size: 24))
@@ -337,145 +291,7 @@ struct MapMarker: View {
     }
 }
 
-// ADD THIS STRUCT - LocationDetailSheet
-struct LocationDetailSheet: View {
-    let location: Location
-    let onClose: () -> Void
-    
-    @State private var isFavorite: Bool
-    
-    init(location: Location, onClose: @escaping () -> Void) {
-        self.location = location
-        self.onClose = onClose
-        _isFavorite = State(initialValue: location.isFavorite)
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(location.name)
-                        .font(.headline)
-                        .lineLimit(2)
-                    
-                    Text(location.address)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .lineLimit(2)
-                }
-                
-                Spacer()
-                
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                }
-            }
-            
-            // Category
-            if !location.category.isEmpty && location.category != "Search Result" {
-                HStack {
-                    Image(systemName: iconForCategory(location.category))
-                        .font(.caption)
-                        .foregroundColor(colorForCategory(location.category))
-                    
-                    Text(location.category)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-            }
-            
-            // Action Buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    openInMaps()
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond")
-                        Text("導航")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.hkBlue)
-                    .foregroundColor(.white)
-                    .font(.subheadline)
-                    .cornerRadius(10)
-                }
-                
-                Button(action: {
-                    toggleFavorite()
-                }) {
-                    HStack {
-                        Image(systemName: isFavorite ? "star.fill" : "star")
-                        Text(isFavorite ? "已收藏" : "收藏")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(isFavorite ? Color.yellow.opacity(0.2) : Color(.systemGray5))
-                    .foregroundColor(isFavorite ? .yellow : .primary)
-                    .font(.subheadline)
-                    .cornerRadius(10)
-                }
-            }
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: -5)
-        .padding(.horizontal)
-        .padding(.bottom, 10)
-    }
-    
-    private func openInMaps() {
-        let coordinate = CLLocationCoordinate2D(
-            latitude: location.latitude,
-            longitude: location.longitude
-        )
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = location.name
-        
-        let launchOptions = [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ]
-        mapItem.openInMaps(launchOptions: launchOptions)
-    }
-    
-    private func toggleFavorite() {
-        isFavorite.toggle()
-        TravelDataManager.shared.updateFavoriteStatus(for: location.id, isFavorite: isFavorite)
-    }
-    
-    // Helper functions for category icons and colors
-    private func iconForCategory(_ category: String) -> String {
-        switch category {
-        case "Transport Hub": return "train.side.front.car"
-        case "Shopping": return "bag.fill"
-        case "Dining": return "fork.knife"
-        case "Entertainment": return "film.fill"
-        default: return "mappin.circle.fill"
-        }
-    }
-    
-    private func colorForCategory(_ category: String) -> Color {
-        switch category {
-        case "Transport Hub": return .blue
-        case "Shopping": return .pink
-        case "Dining": return .orange
-        case "Entertainment": return .purple
-        default: return .gray
-        }
-    }
-}
-
+// MARK: - 预览
 #Preview {
     NavigationView {
         MapView()
