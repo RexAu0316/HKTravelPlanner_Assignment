@@ -13,266 +13,299 @@ struct HomeView: View {
     @State private var isSearching = false
     @State private var showRouteResults = false
     @State private var selectedDate = Date()
+    @State private var showingLocationPicker = false
+    @State private var showingDestinationPicker = false
     
     @ObservedObject var travelDataManager = TravelDataManager.shared
+    @StateObject private var locationManager = LocationManager.shared
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Welcome Title
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("香港智能旅遊規劃")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.hkBlue)
-                    
-                    Text("即時天氣與交通資訊")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
+            VStack(spacing: 24) {
+                // Header with Welcome
+                headerSection
                 
                 // Weather Card
                 weatherSection
                 
                 // Search Card
-                VStack(spacing: 16) {
-                    // Start Location
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("起點位置", systemImage: "location.fill")
-                            .font(.headline)
-                            .foregroundColor(.hkBlue)
-                        
-                        HStack {
-                            TextField("輸入起點或使用當前位置", text: $startLocation)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
-                                .background(Color(.systemGray6))
-                                .cornerRadius(8)
-                            
-                            Button(action: {
-                                startLocation = "當前位置"
-                            }) {
-                                Image(systemName: "location.fill")
-                                    .foregroundColor(.accentOrange)
-                            }
-                        }
-                    }
-                    
-                    // Destination
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("目的地", systemImage: "flag.fill")
-                            .font(.headline)
-                            .foregroundColor(.hkRed)
-                        
-                        TextField("輸入目的地", text: $endLocation)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                    }
-                    
-                    // Time Selection
-                    DatePicker("出發時間", selection: $selectedDate, displayedComponents: .hourAndMinute)
-                        .font(.headline)
-                        .foregroundColor(.hkBlue)
-                    
-                    // Search Button
-                    Button(action: {
-                        isSearching = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            isSearching = false
-                            showRouteResults = true
-                        }
-                    }) {
-                        HStack {
-                            if isSearching {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "magnifyingglass")
-                                Text("規劃路線")
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.hkBlue)
-                        .foregroundColor(.white)
-                        .font(.headline)
-                        .cornerRadius(12)
-                    }
-                    .disabled(startLocation.isEmpty || endLocation.isEmpty || isSearching)
-                }
-                .padding()
-                .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                .padding(.horizontal)
+                searchSection
+                
+                // Quick Actions
+                quickActionsSection
                 
                 // Recent Searches
                 if !travelDataManager.recentRoutes.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("最近搜尋")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.hkBlue)
-                            
-                            Spacer()
-                            
-                            Button("查看全部") {
-                                // Navigate to history
-                            }
-                            .font(.subheadline)
-                            .foregroundColor(.accentOrange)
-                        }
-                        
-                        ForEach(travelDataManager.recentRoutes.prefix(2)) { route in
-                            RecentRouteCard(route: route)
-                        }
-                    }
-                    .padding()
+                    recentSearchesSection
                 }
                 
-                // Quick Access
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("快速訪問")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.hkBlue)
-                    
-                    HStack(spacing: 15) {
-                        QuickAccessButton(
-                            icon: "star.fill",
-                            title: "收藏夾",
-                            color: .yellow
-                        ) {
-                            // Navigate to favorites
-                        }
-                        
-                        QuickAccessButton(
-                            icon: "clock.fill",
-                            title: "歷史記錄",
-                            color: .green
-                        ) {
-                            // Navigate to history
-                        }
-                        
-                        QuickAccessButton(
-                            icon: "map.fill",
-                            title: "探索香港",
-                            color: .purple
-                        ) {
-                            // Navigate to map
-                        }
-                    }
-                }
-                .padding()
+                Spacer(minLength: 20)
             }
-            .padding(.vertical)
+            .padding(.top, 20)
+            .padding(.horizontal, 16)
         }
-        .background(Color.lightBackground)
+        .background(Color(.systemGroupedBackground))
         .sheet(isPresented: $showRouteResults) {
             if let start = travelDataManager.locations.first, let end = travelDataManager.locations.last {
                 RouteResultsView(routes: travelDataManager.getRoutes(from: start, to: end))
             }
         }
         .onAppear {
-            // Load weather when view appears
             if travelDataManager.currentWeather.condition == "加載中..." {
                 travelDataManager.fetchRealTimeWeather()
             }
         }
     }
     
+    // MARK: - Header Section
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(getGreeting())
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text("香港智能旅遊規劃")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    // Profile action
+                }) {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.hkBlue)
+                }
+            }
+            
+            Divider()
+        }
+    }
+    
+    // MARK: - Weather Section
     private var weatherSection: some View {
         Group {
             if travelDataManager.isLoadingWeather {
                 WeatherLoadingView()
-                    .padding(.horizontal)
             } else if let error = travelDataManager.weatherError {
                 WeatherErrorView(error: error) {
                     travelDataManager.fetchRealTimeWeather()
                 }
-                .padding(.horizontal)
             } else {
-                WeatherCardView(weather: travelDataManager.currentWeather)
-                    .padding(.horizontal)
+                ModernWeatherCard(weather: travelDataManager.currentWeather)
             }
         }
+        .padding(.horizontal, 4)
     }
-}
-
-// 加載視圖
-struct WeatherLoadingView: View {
-    var body: some View {
-        HStack {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-            Text("獲取天氣數據中...")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(16)
-    }
-}
-
-// 錯誤視圖
-struct WeatherErrorView: View {
-    let error: String
-    let retryAction: () -> Void
     
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title)
-                .foregroundColor(.orange)
+    // MARK: - Search Section
+    private var searchSection: some View {
+        VStack(spacing: 20) {
+            // Title
+            HStack {
+                Text("規劃路線")
+                    .font(.headline)
+                    .foregroundColor(.hkBlue)
+                Spacer()
+                Image(systemName: "route")
+                    .foregroundColor(.hkBlue)
+            }
             
-            Text("天氣數據暫時不可用")
-                .font(.headline)
+            // Search Fields
+            VStack(spacing: 16) {
+                // Start Location
+                LocationField(
+                    icon: "location.fill",
+                    iconColor: .accentOrange,
+                    title: "起點位置",
+                    placeholder: "輸入起點",
+                    text: $startLocation,
+                    showPicker: $showingLocationPicker,
+                    isCurrentLocation: startLocation == "當前位置"
+                )
+                
+                // Destination
+                LocationField(
+                    icon: "flag.fill",
+                    iconColor: .hkRed,
+                    title: "目的地",
+                    placeholder: "輸入目的地",
+                    text: $endLocation,
+                    showPicker: $showingDestinationPicker,
+                    isCurrentLocation: false
+                )
+                
+                // Time Selection
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.hkBlue)
+                            .font(.caption)
+                        Text("出發時間")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    DatePicker("", selection: $selectedDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(CompactDatePickerStyle())
+                        .labelsHidden()
+                        .accentColor(.hkBlue)
+                }
+                .padding(.vertical, 8)
+            }
             
-            Text(error)
-                .font(.caption)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-            
-            Button("重試", action: retryAction)
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(Color.hkBlue)
+            // Search Button
+            Button(action: {
+                isSearching = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isSearching = false
+                    showRouteResults = true
+                }
+            }) {
+                HStack {
+                    if isSearching {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "magnifyingglass")
+                        Text("規劃路線")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.hkBlue, Color.hkBlue.opacity(0.8)]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
                 .foregroundColor(.white)
-                .cornerRadius(8)
+                .font(.headline)
+                .cornerRadius(12)
+                .shadow(color: .hkBlue.opacity(0.3), radius: 5, x: 0, y: 3)
+            }
+            .disabled(startLocation.isEmpty || endLocation.isEmpty || isSearching)
+            .opacity(startLocation.isEmpty || endLocation.isEmpty ? 0.6 : 1)
         }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color.orange.opacity(0.1))
+        .padding(20)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+    }
+    
+    // MARK: - Quick Actions Section
+    private var quickActionsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("快速功能")
+                .font(.headline)
+                .foregroundColor(.hkBlue)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 16) {
+                QuickActionButton(
+                    icon: "map.fill",
+                    title: "附近景點",
+                    color: .blue,
+                    action: { }
+                )
+                
+                QuickActionButton(
+                    icon: "star.fill",
+                    title: "收藏地點",
+                    color: .yellow,
+                    action: { }
+                )
+                
+                QuickActionButton(
+                    icon: "clock.arrow.circlepath",
+                    title: "歷史記錄",
+                    color: .green,
+                    action: { }
+                )
+                
+                QuickActionButton(
+                    icon: "exclamationmark.triangle.fill",
+                    title: "交通狀況",
+                    color: .orange,
+                    action: { }
+                )
+            }
+        }
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+    }
+    
+    // MARK: - Recent Searches Section
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("最近搜尋")
+                    .font(.headline)
+                    .foregroundColor(.hkBlue)
+                
+                Spacer()
+                
+                Button("查看全部") {
+                    // Navigate to history
+                }
+                .font(.caption)
+                .foregroundColor(.hkBlue)
+            }
+            
+            ForEach(travelDataManager.recentRoutes.prefix(2)) { route in
+                ModernRecentRouteCard(route: route)
+            }
+        }
+        .padding(20)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+    }
+    
+    private func getGreeting() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "早晨！"
+        case 12..<18: return "午安！"
+        case 18..<22: return "晚上好！"
+        default: return "你好！"
+        }
     }
 }
 
-struct WeatherCardView: View {
+// MARK: - Modern Weather Card
+struct ModernWeatherCard: View {
     let weather: WeatherData
     
     var body: some View {
-        HStack(spacing: 15) {
-            // 天氣圖標
+        HStack(spacing: 20) {
+            // Weather Icon
             VStack {
                 Image(systemName: weather.systemIconName)
                     .font(.system(size: 50))
                     .foregroundColor(weatherColor)
+                    .frame(height: 60)
                 
                 Text(weather.condition)
                     .font(.caption)
                     .fontWeight(.medium)
+                    .foregroundColor(.secondary)
             }
             .frame(width: 80)
             
-            // 溫度資訊
+            // Temperature Info
             VStack(alignment: .leading, spacing: 4) {
                 Text("香港天氣")
                     .font(.headline)
@@ -280,50 +313,57 @@ struct WeatherCardView: View {
                 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(Int(weather.temperature))")
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
                     Text("°C")
                         .font(.title2)
                 }
+                .foregroundColor(weatherColor)
                 
                 Text("體感溫度: \(Int(weather.feelsLike))°C")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            // 詳細資訊
-            VStack(alignment: .trailing, spacing: 6) {
-                HStack {
-                    Image(systemName: "humidity.fill")
-                        .foregroundColor(.blue)
-                        .font(.caption)
-                    Text("\(weather.humidity)%")
-                        .font(.caption)
-                }
-                                
+            // Details
+            VStack(alignment: .trailing, spacing: 8) {
+                WeatherDetailRow(
+                    icon: "humidity.fill",
+                    value: "\(weather.humidity)%",
+                    color: .blue
+                )
+                
                 if weather.rainfall > 0 {
-                    HStack {
-                        Image(systemName: "drop.fill")
-                            .foregroundColor(.blue)
-                            .font(.caption)
-                        Text("\(String(format: "%.1f", weather.rainfall)) mm")
-                            .font(.caption)
-                    }
+                    WeatherDetailRow(
+                        icon: "drop.fill",
+                        value: "\(String(format: "%.1f", weather.rainfall)) mm",
+                        color: .blue
+                    )
                 }
+                
+                WeatherDetailRow(
+                    icon: "wind",
+                    value: "\(String(format: "%.1f", weather.windSpeed)) km/h",
+                    color: .gray
+                )
                 
                 Text("更新: \(formattedTime)")
                     .font(.caption2)
                     .foregroundColor(.gray)
             }
         }
-        .padding()
+        .padding(20)
         .background(
             LinearGradient(
-                colors: [weatherColor.opacity(0.2), weatherColor.opacity(0.05)],
+                gradient: Gradient(colors: [weatherColor.opacity(0.1), weatherColor.opacity(0.05)]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(weatherColor.opacity(0.3), lineWidth: 1)
         )
         .cornerRadius(16)
     }
@@ -347,62 +387,205 @@ struct WeatherCardView: View {
     }
 }
 
-struct RecentRouteCard: View {
+// MARK: - Weather Detail Row
+struct WeatherDetailRow: View {
+    let icon: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color)
+            Text(value)
+                .font(.caption)
+                .foregroundColor(.primary)
+        }
+    }
+}
+
+// MARK: - Location Field Component
+struct LocationField: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let placeholder: String
+    @Binding var text: String
+    @Binding var showPicker: Bool
+    let isCurrentLocation: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(iconColor)
+                    .font(.caption)
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack {
+                TextField(placeholder, text: $text)
+                    .padding(.leading, 8)
+                    .foregroundColor(.primary)
+                
+                if isCurrentLocation {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.accentOrange)
+                        .padding(.trailing, 8)
+                } else {
+                    Button(action: {
+                        showPicker = true
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                            .font(.caption)
+                            .padding(.trailing, 8)
+                    }
+                }
+            }
+            .padding(.vertical, 12)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+        }
+    }
+}
+
+// MARK: - Modern Recent Route Card
+struct ModernRecentRouteCard: View {
     let route: TravelRoute
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
+            // Route Icon
+            ZStack {
+                Circle()
+                    .fill(Color.hkBlue.opacity(0.1))
+                    .frame(width: 50, height: 50)
+                
+                Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.hkBlue)
+            }
+            
+            // Route Details
             VStack(alignment: .leading, spacing: 6) {
                 Text(route.startLocation.name)
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                     .foregroundColor(.primary)
                 
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.down")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.gray)
                     
                     Text(route.endLocation.name)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 HStack {
-                    Label("\(route.duration) 分鐘", systemImage: "clock")
-                        .font(.caption)
+                    Label("\(route.duration)分鐘", systemImage: "clock")
+                        .font(.caption2)
                         .foregroundColor(.accentOrange)
                     
                     Spacer()
                     
-                    ForEach(route.transportationModes, id: \.self) { mode in
-                        Text(mode)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.hkBlue.opacity(0.1))
-                            .foregroundColor(.hkBlue)
-                            .cornerRadius(4)
+                    HStack(spacing: 4) {
+                        ForEach(route.transportationModes, id: \.self) { mode in
+                            Text(mode)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.hkBlue.opacity(0.1))
+                                .foregroundColor(.hkBlue)
+                                .cornerRadius(4)
+                        }
                     }
                 }
             }
             
             Spacer()
             
+            // Replan Button
             Button(action: {
                 // Replan this route
             }) {
                 Image(systemName: "arrow.clockwise")
+                    .font(.callout)
                     .foregroundColor(.hkBlue)
+                    .frame(width: 36, height: 36)
+                    .background(Color.hkBlue.opacity(0.1))
+                    .cornerRadius(18)
             }
         }
-        .padding()
-        .background(Color.white)
+        .padding(16)
+        .background(Color(.systemGray6).opacity(0.5))
         .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
     }
 }
 
-struct QuickAccessButton: View {
+// MARK: - Weather Loading View
+struct WeatherLoadingView: View {
+    var body: some View {
+        HStack {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+            Text("獲取天氣數據中...")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .background(Color(.systemGray6))
+        .cornerRadius(16)
+    }
+}
+
+// MARK: - Weather Error View
+struct WeatherErrorView: View {
+    let error: String
+    let retryAction: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title2)
+                .foregroundColor(.orange)
+            
+            Text("天氣數據暫時不可用")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text(error)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            
+            Button(action: retryAction) {
+                Text("重試")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color.hkBlue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(16)
+    }
+}
+
+// MARK: - Quick Action Button
+struct QuickActionButton: View {
     let icon: String
     let title: String
     let color: Color
@@ -411,20 +594,22 @@ struct QuickAccessButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.1))
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(color)
+                }
                 
                 Text(title)
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(.caption2)
+                    .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
         }
     }
 }

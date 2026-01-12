@@ -17,23 +17,23 @@ struct ContentView: View {
                 HomeView()
                     .tabItem {
                         Image(systemName: "house.fill")
-                        Text("Home")
+                        Text("主頁")
                     }
                     .tag(0)
                 
-                // Tab 2: Favorites
-                FavoritesView()
-                    .tabItem {
-                        Image(systemName: "star.fill")
-                        Text("Favorites")
-                    }
-                    .tag(1)
-                
-                // Tab 3: Map
+                // Tab 2: Map
                 MapView()
                     .tabItem {
                         Image(systemName: "map.fill")
-                        Text("Map")
+                        Text("地圖")
+                    }
+                    .tag(1)
+                
+                // Tab 3: Transport
+                TransportView()
+                    .tabItem {
+                        Image(systemName: "bus.fill")
+                        Text("交通")
                     }
                     .tag(2)
                 
@@ -41,13 +41,25 @@ struct ContentView: View {
                 SettingsView()
                     .tabItem {
                         Image(systemName: "gearshape.fill")
-                        Text("Settings")
+                        Text("設定")
                     }
                     .tag(3)
             }
             .accentColor(.hkBlue)
+            .onAppear {
+                // Custom tab bar appearance
+                let appearance = UITabBarAppearance()
+                appearance.configureWithOpaqueBackground()
+                appearance.backgroundColor = UIColor.systemBackground
+                
+                // Apply the appearance
+                UITabBar.appearance().standardAppearance = appearance
+                if #available(iOS 15.0, *) {
+                    UITabBar.appearance().scrollEdgeAppearance = appearance
+                }
+            }
         }
-        .navigationViewStyle(StackNavigationViewStyle()) // For iPad support
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 

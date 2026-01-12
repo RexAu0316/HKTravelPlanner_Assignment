@@ -364,3 +364,10 @@ extension Color {
     static let accentOrange = Color(red: 1.0, green: 0.58, blue: 0.0)
     static let lightBackground = Color(red: 0.95, green: 0.95, blue: 0.97)
 }
+
+// MARK: - UIKit Color Extensions
+extension UIColor {
+    static let hkBlue = UIColor(red: 0.0, green: 0.29, blue: 0.55, alpha: 1.0)
+    static let hkRed = UIColor(red: 0.78, green: 0.06, blue: 0.18, alpha: 1.0)
+    static let accentOrange = UIColor(red: 1.0, green: 0.58, blue: 0.0, alpha: 1.0)
+}
