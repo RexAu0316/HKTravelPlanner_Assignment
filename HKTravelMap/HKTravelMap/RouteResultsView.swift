@@ -20,10 +20,29 @@ struct RouteResultsView: View {
     @State private var mapViewHeight: CGFloat = 300
     @State private var showRouteDetails = false
     
+    // 添加 TravelDataManager 觀察對象
+    @ObservedObject var travelDataManager = TravelDataManager.shared
+    
     // 模擬導航狀態
     @State private var isNavigating = false
     @State private var navigationProgress: Double = 0.0
     @State private var remainingTime: Int = 45
+    
+    // 保存確認狀態
+    @State private var saveSuccessMessage = ""
+    @State private var showSaveSuccess = false
+    
+    var selectedRoute: TravelRoute? {
+        if let selectedId = selectedRouteId {
+            return routes.first { $0.id == selectedId }
+        }
+        return routes.first
+    }
+    
+    var isCurrentRouteSaved: Bool {
+        guard let route = selectedRoute else { return false }
+        return travelDataManager.isRouteSaved(route)
+    }
     
     var body: some View {
         NavigationView {
@@ -54,6 +73,7 @@ struct RouteResultsView: View {
                                 route: route,
                                 isSelected: selectedRouteId == route.id,
                                 isExpanded: expandedRouteId == route.id,
+                                isSaved: travelDataManager.isRouteSaved(route),
                                 onSelect: {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         selectedRouteId = route.id
@@ -64,6 +84,9 @@ struct RouteResultsView: View {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         expandedRouteId = expandedRouteId == route.id ? nil : route.id
                                     }
+                                },
+                                onSave: {
+                                    saveRoute(route)
                                 }
                             )
                         }
@@ -90,7 +113,11 @@ struct RouteResultsView: View {
                         showSaveConfirmation: $showSaveConfirmation,
                         isSaved: $isSaved,
                         onNavigate: startNavigation,
-                        onSave: saveRoute,
+                        onSave: {
+                            if let route = selectedRoute {
+                                saveRoute(route)
+                            }
+                        },
                         onClose: { presentationMode.wrappedValue.dismiss() }
                     )
                     .padding(.horizontal)
@@ -100,9 +127,32 @@ struct RouteResultsView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationBarTitle("路線結果", displayMode: .inline)
-            .navigationBarItems(trailing: Button("關閉") {
-                presentationMode.wrappedValue.dismiss()
-            })
+            .navigationBarItems(
+                leading: Button("返回") {
+                    presentationMode.wrappedValue.dismiss()
+                },
+                trailing: HStack(spacing: 16) {
+                    // 保存狀態指示器
+                    if isCurrentRouteSaved {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.caption)
+                            Text("已保存")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
+                    Button("完成") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            )
             .sheet(isPresented: $showRouteDetails) {
                 if let route = routes.first(where: { $0.id == selectedRouteId }) {
                     RouteDetailsFullView(route: route)
@@ -116,14 +166,33 @@ struct RouteResultsView: View {
                         onCancel: cancelNavigation
                     )
                 }
+                
+                // 保存成功提示
+                if showSaveSuccess {
+                    SaveSuccessOverlay(message: saveSuccessMessage)
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                withAnimation {
+                                    showSaveSuccess = false
+                                }
+                            }
+                        }
+                }
             }
             .onAppear {
                 if let firstRoute = routes.first {
                     selectedRouteId = firstRoute.id
+                    // 檢查是否已保存
+                    isSaved = travelDataManager.isRouteSaved(firstRoute)
                 }
                 
                 // 初始化模擬數據
                 setupMockData()
+            }
+            .onChange(of: selectedRouteId) { newId in
+                if let route = routes.first(where: { $0.id == newId }) {
+                    isSaved = travelDataManager.isRouteSaved(route)
+                }
             }
         }
     }
@@ -132,6 +201,57 @@ struct RouteResultsView: View {
         // 設置模擬導航進度
         navigationProgress = 0.0
         remainingTime = routes.first?.duration ?? 45
+    }
+    
+    // MARK: - 保存路線功能
+    
+    private func saveRoute(_ route: TravelRoute) {
+        if travelDataManager.isRouteSaved(route) {
+            // 如果已保存，詢問是否移除
+            removeSavedRoute(route)
+        } else {
+            // 保存路線
+            travelDataManager.addSavedRoute(route)
+            isSaved = true
+            
+            // 顯示保存成功提示
+            saveSuccessMessage = "路線已保存到收藏"
+            withAnimation(.spring()) {
+                showSaveSuccess = true
+            }
+            
+            // 添加觸覺反饋
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            
+            // 3秒後隱藏提示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation(.easeOut) {
+                    showSaveSuccess = false
+                }
+            }
+        }
+    }
+    
+    private func removeSavedRoute(_ route: TravelRoute) {
+        travelDataManager.removeSavedRoute(route)
+        isSaved = false
+        
+        // 顯示移除提示
+        saveSuccessMessage = "已從收藏中移除"
+        withAnimation(.spring()) {
+            showSaveSuccess = true
+        }
+        
+        // 添加觸覺反饋
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.easeOut) {
+                showSaveSuccess = false
+            }
+        }
     }
     
     private func startNavigation() {
@@ -162,22 +282,6 @@ struct RouteResultsView: View {
             isNavigating = false
             navigationProgress = 0.0
             remainingTime = routes.first?.duration ?? 45
-        }
-    }
-    
-    private func saveRoute() {
-        withAnimation(.spring()) {
-            isSaved = true
-        }
-        
-        // 顯示保存確認
-        showSaveConfirmation = true
-        
-        // 3秒後恢復
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            withAnimation(.easeOut) {
-                showSaveConfirmation = false
-            }
         }
     }
 }
@@ -454,8 +558,10 @@ struct RouteDetailCard: View {
     let route: TravelRoute
     let isSelected: Bool
     let isExpanded: Bool
+    let isSaved: Bool
     let onSelect: () -> Void
     let onExpand: () -> Void
+    let onSave: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
@@ -489,18 +595,34 @@ struct RouteDetailCard: View {
                 
                 Spacer()
                 
-                // 選擇指示器
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.hkBlue)
-                }
-                
-                // 展開按鈕
-                Button(action: onExpand) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.body)
-                        .foregroundColor(.gray)
+                HStack(spacing: 12) {
+                    // 保存狀態指示器
+                    if isSaved {
+                        Image(systemName: "bookmark.fill")
+                            .font(.caption)
+                            .foregroundColor(.hkBlue)
+                    }
+                    
+                    // 選擇指示器
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.hkBlue)
+                    }
+                    
+                    // 保存按鈕
+                    Button(action: onSave) {
+                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                            .font(.body)
+                            .foregroundColor(isSaved ? .hkBlue : .gray)
+                    }
+                    
+                    // 展開按鈕
+                    Button(action: onExpand) {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.body)
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -542,16 +664,31 @@ struct RouteDetailCard: View {
                                 .cornerRadius(8)
                         }
                         
+                        Button(action: onSave) {
+                            HStack(spacing: 4) {
+                                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                                Text(isSaved ? "已保存" : "保存路線")
+                            }
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(isSaved ? Color.green.opacity(0.1) : Color.gray.opacity(0.1))
+                            .foregroundColor(isSaved ? .green : .gray)
+                            .cornerRadius(8)
+                        }
+                        
                         Button(action: {
                             // 分享路線
+                            shareRoute()
                         }) {
                             Text("分享")
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(Color.gray.opacity(0.1))
-                                .foregroundColor(.gray)
+                                .background(Color.purple.opacity(0.1))
+                                .foregroundColor(.purple)
                                 .cornerRadius(8)
                         }
                     }
@@ -568,6 +705,34 @@ struct RouteDetailCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(isSelected ? Color.hkBlue.opacity(0.3) : Color.clear, lineWidth: 2)
         )
+    }
+    
+    private func shareRoute() {
+        let routeText = """
+        路線: \(route.startLocation.name) → \(route.endLocation.name)
+        時間: \(route.duration)分鐘
+        費用: HK$ \(calculateFare())
+        出發時間: \(formatDate(route.departureTime))
+        
+        步驟:
+        \(route.steps.map { "• \($0.instruction) (\($0.duration)分鐘)" }.joined(separator: "\n"))
+        """
+        
+        let activityViewController = UIActivityViewController(
+            activityItems: [routeText],
+            applicationActivities: nil
+        )
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            window.rootViewController?.present(activityViewController, animated: true)
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
     
     private func calculateFare() -> Int {
@@ -878,16 +1043,21 @@ struct ActionButtonsView: View {
                 // 保存按鈕
                 Button(action: onSave) {
                     HStack {
-                        Image(systemName: isSaved ? "checkmark" : "star.fill")
+                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                             .font(.headline)
+                            .foregroundColor(isSaved ? .white : .hkBlue)
                         
                         Text(isSaved ? "已保存" : "保存路線")
                             .fontWeight(.medium)
+                            .foregroundColor(isSaved ? .white : .hkBlue)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.yellow.opacity(isSaved ? 0.3 : 0.2))
-                    .foregroundColor(isSaved ? .green : .yellow)
+                    .background(isSaved ? Color.hkBlue : Color.hkBlue.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.hkBlue, lineWidth: isSaved ? 0 : 1)
+                    )
                     .font(.headline)
                     .cornerRadius(12)
                 }
@@ -1015,6 +1185,38 @@ struct NavigationOverlay: View {
             )
             .padding(40)
         }
+    }
+}
+
+// MARK: - 保存成功覆蓋層
+struct SaveSuccessOverlay: View {
+    let message: String
+    
+    var body: some View {
+        VStack {
+            Spacer()
+            
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+                
+                Text(message)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(
+                Capsule()
+                    .fill(Color.green.opacity(0.9))
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            )
+            .padding(.bottom, 50)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: message)
     }
 }
 

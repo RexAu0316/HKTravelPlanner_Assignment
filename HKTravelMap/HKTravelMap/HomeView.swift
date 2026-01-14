@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var showHistoryView = false
     @State private var selectedTab = 0
     @State private var showCurrentLocationOption = false
+    @State private var showSavedRoutesView = false
     
     @AppStorage("userName") private var userName = "Guest"
     @AppStorage("isFirstLaunch") private var isFirstLaunch = true
@@ -49,6 +50,7 @@ struct HomeView: View {
             showHistoryView: $showHistoryView,
             selectedTab: $selectedTab,
             showCurrentLocationOption: $showCurrentLocationOption,
+            showSavedRoutesView: $showSavedRoutesView,
             userName: userName,
             saveHistory: saveHistory,
             autoUpdateWeather: autoUpdateWeather,
@@ -69,6 +71,10 @@ struct HomeView: View {
         .sheet(isPresented: $showFavoritesView) {
             FavoritesView()
         }
+        .sheet(isPresented: $showSavedRoutesView) {
+            SavedRoutesView()
+        }
+
 
         .alert("提示", isPresented: $showErrorAlert) {
             Button("確定", role: .cancel) { }
@@ -294,6 +300,7 @@ struct HomeMainContainer: View {
     @Binding var showHistoryView: Bool
     @Binding var selectedTab: Int
     @Binding var showCurrentLocationOption: Bool
+    @Binding var showSavedRoutesView: Bool
     
     let userName: String
     let saveHistory: Bool
@@ -338,7 +345,8 @@ struct HomeMainContainer: View {
                     QuickActionsSection(
                         selectedTab: $selectedTab,
                         showFavoritesView: $showFavoritesView,
-                        showHistoryView: $showHistoryView
+                        showHistoryView: $showHistoryView,
+                        showSavedRoutesView: $showSavedRoutesView
                     )
                     
                     // Recent Searches
@@ -723,6 +731,7 @@ struct QuickActionsSection: View {
     @Binding var selectedTab: Int
     @Binding var showFavoritesView: Bool
     @Binding var showHistoryView: Bool
+    @Binding var showSavedRoutesView: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -736,17 +745,7 @@ struct QuickActionsSection: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 16) {
-                
-                // CHANGED: QuickActionButton -> HomeQuickActionButton
-                HomeQuickActionButton(
-                    icon: "star.fill",
-                    title: "收藏地點",
-                    color: .yellow,
-                    action: {
-                        showFavoritesView = true
-                    }
-                )
-                
+                                
                 // CHANGED: QuickActionButton -> HomeQuickActionButton
                 HomeQuickActionButton(
                     icon: "clock.arrow.circlepath",
@@ -756,7 +755,15 @@ struct QuickActionsSection: View {
                         showHistoryView = true
                     }
                 )
-                
+                HomeQuickActionButton(
+                    icon: "bookmark.fill",
+                    title: "保存路線",
+                    color: .hkBlue,
+                    action: {
+                        showSavedRoutesView = true
+                    }
+                )
+
             }
         }
         .padding(20)
@@ -1333,6 +1340,8 @@ struct GuidePage {
 }
 
 // MARK: - Favorites View
+// 在 HomeView.swift 中，修改 FavoritesView 結構體：
+
 struct FavoritesView: View {
     @ObservedObject var travelDataManager = TravelDataManager.shared
     @Environment(\.presentationMode) var presentationMode
@@ -1344,50 +1353,25 @@ struct FavoritesView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            Group {
                 if favoriteLocations.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "star.slash")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        
-                        Text("尚未收藏任何地點")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        Text("在地圖或搜索結果中點擊星號圖標來收藏地點")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .frame(maxHeight: .infinity)
+                    EmptyFavoritesView()
                 } else {
                     List {
-                        Section {
-                            ForEach(favoriteLocations) { location in
-                                FavoriteLocationRow(location: location)
-                            }
-                            .onDelete { indexSet in
-                                for index in indexSet {
-                                    let location = favoriteLocations[index]
-                                    travelDataManager.updateFavoriteStatus(for: location.id, isFavorite: false)
+                        ForEach(favoriteLocations) { location in
+                            FavoriteLocationRow(
+                                location: location,
+                                isFavorite: true,
+                                onToggleFavorite: {
+                                    travelDataManager.updateFavoriteStatus(
+                                        for: location.id,
+                                        isFavorite: false
+                                    )
                                 }
-                            }
-                        } header: {
-                            HStack {
-                                Text("共 \(favoriteLocations.count) 個收藏")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                Button("清除全部") {
-                                    showingClearAlert = true
-                                }
-                                .font(.caption)
-                                .foregroundColor(.red)
-                            }
+                            )
+                        }
+                        .onDelete { indexSet in
+                            deleteFavorites(at: indexSet)
                         }
                     }
                     .listStyle(InsetGroupedListStyle())
@@ -1395,9 +1379,18 @@ struct FavoritesView: View {
             }
             .navigationTitle("收藏地點")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(trailing: Button("完成") {
-                presentationMode.wrappedValue.dismiss()
-            })
+            .navigationBarItems(
+                leading: Button("完成") {
+                    presentationMode.wrappedValue.dismiss()
+                },
+                trailing: !favoriteLocations.isEmpty ?
+                    Button(action: {
+                        showingClearAlert = true
+                    }) {
+                        Text("清除")
+                            .foregroundColor(.red)
+                    } : nil
+            )
             .alert("清除收藏", isPresented: $showingClearAlert) {
                 Button("取消", role: .cancel) { }
                 Button("清除", role: .destructive) {
@@ -1408,18 +1401,53 @@ struct FavoritesView: View {
             }
         }
     }
+    
+    private func deleteFavorites(at offsets: IndexSet) {
+        for index in offsets {
+            let location = favoriteLocations[index]
+            travelDataManager.updateFavoriteStatus(for: location.id, isFavorite: false)
+        }
+    }
 }
 
+// 添加空狀態視圖
+struct EmptyFavoritesView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "star.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            Text("尚未收藏任何地點")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text("在地圖或搜索結果中點擊星號圖標來收藏地點")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxHeight: .infinity)
+        .padding()
+    }
+}
+
+// 修改 FavoriteLocationRow，添加更多功能
 struct FavoriteLocationRow: View {
     let location: Location
+    let isFavorite: Bool
+    let onToggleFavorite: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
+            // 地點圖標
             Image(systemName: locationIcon(for: location.category))
                 .foregroundColor(categoryColor(for: location.category))
                 .font(.title3)
                 .frame(width: 32)
             
+            // 地點信息
             VStack(alignment: .leading, spacing: 4) {
                 Text(location.name)
                     .font(.subheadline)
@@ -1434,11 +1462,69 @@ struct FavoriteLocationRow: View {
             
             Spacer()
             
-            Image(systemName: "star.fill")
-                .foregroundColor(.yellow)
+            // 收藏按鈕
+            Button(action: onToggleFavorite) {
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .foregroundColor(isFavorite ? .yellow : .gray)
+                    .font(.title3)
+            }
+            .buttonStyle(BorderlessButtonStyle())
         }
         .padding(.vertical, 8)
+        .contextMenu {
+            Button(action: {
+                onToggleFavorite()
+            }) {
+                Label(isFavorite ? "取消收藏" : "加入收藏",
+                      systemImage: isFavorite ? "star.slash" : "star")
+            }
+            
+            Button(action: {
+                // 分享地點
+                shareLocation(location)
+            }) {
+                Label("分享", systemImage: "square.and.arrow.up")
+            }
+        }
     }
+    
+    private func shareLocation(_ location: Location) {
+        let text = "地點: \(location.name)\n地址: \(location.address)\n"
+        let activityViewController = UIActivityViewController(
+            activityItems: [text],
+            applicationActivities: nil
+        )
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            window.rootViewController?.present(activityViewController, animated: true)
+        }
+    }
+    
+    private func locationIcon(for category: String) -> String {
+        switch category {
+        case "Transport Hub": return "train.side.front.car"
+        case "Shopping": return "bag.fill"
+        case "Dining": return "fork.knife"
+        case "Entertainment": return "film.fill"
+        case "Park": return "leaf.fill"
+        case "Hotel": return "bed.double.fill"
+        default: return "mappin"
+        }
+    }
+    
+    private func categoryColor(for category: String) -> Color {
+        switch category {
+        case "Transport Hub": return .blue
+        case "Shopping": return .pink
+        case "Dining": return .orange
+        case "Entertainment": return .purple
+        case "Park": return .green
+        case "Hotel": return .teal
+        default: return .gray
+        }
+    }
+}
     
     private func locationIcon(for category: String) -> String {
         switch category {
@@ -1459,7 +1545,7 @@ struct FavoriteLocationRow: View {
         default: return .gray
         }
     }
-}
+
 
 
 #Preview {

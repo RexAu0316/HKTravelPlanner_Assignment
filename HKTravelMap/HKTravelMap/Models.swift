@@ -86,6 +86,7 @@ struct WeatherData: Codable {
 extension UserDefaults {
     static let recentRoutesKey = "recentTravelRoutes"
     static let favoriteLocationIDsKey = "favoriteLocationIDs"
+    static let savedRoutesKey = "savedTravelRoutes"
     static let saveHistoryKey = "saveHistoryPreference"
 }
 
@@ -213,6 +214,7 @@ class TravelDataManager: ObservableObject {
     
     // 從 UserDefaults 加載的歷史記錄
     @Published var recentRoutes: [TravelRoute] = []
+    @Published var savedRoutes: [TravelRoute] = []
     private var favoriteLocationIDs: Set<UUID> = []
     
     private init() {
@@ -241,6 +243,7 @@ class TravelDataManager: ObservableObject {
     private func loadSavedData() {
         loadRecentRoutes()
         loadFavoriteLocations()
+        loadSavedRoutes()
     }
     
     /// 加載最近搜索路線
@@ -272,6 +275,17 @@ class TravelDataManager: ObservableObject {
         }
     }
     
+    /// 加載保存的路線
+    private func loadSavedRoutes() {
+        if let data = UserDefaults.standard.data(forKey: UserDefaults.savedRoutesKey) {
+            let decoder = JSONDecoder()
+            if let routes = try? decoder.decode([TravelRoute].self, from: data) {
+                savedRoutes = routes
+                print("✅ 已加載保存的路線: \(routes.count) 條")
+            }
+        }
+    }
+    
     /// 保存最近搜索路線
     private func saveRecentRoutes() {
         let encoder = JSONEncoder()
@@ -286,6 +300,15 @@ class TravelDataManager: ObservableObject {
         let ids = Array(favoriteLocationIDs)
         if let encoded = try? encoder.encode(ids) {
             UserDefaults.standard.set(encoded, forKey: UserDefaults.favoriteLocationIDsKey)
+        }
+    }
+    
+    /// 保存路線到 UserDefaults
+    private func saveSavedRoutes() {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(savedRoutes) {
+            UserDefaults.standard.set(encoded, forKey: UserDefaults.savedRoutesKey)
+            print("✅ 已保存路線: \(savedRoutes.count) 條")
         }
     }
     
@@ -425,9 +448,11 @@ class TravelDataManager: ObservableObject {
             if isFavorite {
                 // 添加到收藏集合
                 favoriteLocationIDs.insert(locationId)
+                print("⭐ 已收藏地點: \(locations[index].name)")
             } else {
                 // 從收藏集合移除
                 favoriteLocationIDs.remove(locationId)
+                print("⭐ 已取消收藏: \(locations[index].name)")
             }
             
             // 保存收藏列表
@@ -435,6 +460,8 @@ class TravelDataManager: ObservableObject {
             
             // 通知視圖更新
             objectWillChange.send()
+        } else {
+            print("❌ 找不到地點 ID: \(locationId)")
         }
     }
     
@@ -464,7 +491,50 @@ class TravelDataManager: ObservableObject {
         }
         saveFavoriteLocations()
         objectWillChange.send()
+        
+        print("✅ 已清除所有收藏")
     }
+    
+    // MARK: - 已保存路線管理
+    
+    /// 添加路線到已保存列表
+    func addSavedRoute(_ route: TravelRoute) {
+        // 檢查是否已經保存過（根據起點和終點名稱判斷）
+        if !savedRoutes.contains(where: {
+            $0.startLocation.name == route.startLocation.name &&
+            $0.endLocation.name == route.endLocation.name
+        }) {
+            savedRoutes.insert(route, at: 0)
+            saveSavedRoutes()
+            objectWillChange.send()
+            print("✅ 路線已保存: \(route.startLocation.name) → \(route.endLocation.name)")
+        } else {
+            print("⚠️ 路線已存在，無需重複保存")
+        }
+    }
+    
+    /// 從已保存列表中移除路線
+    func removeSavedRoute(_ route: TravelRoute) {
+        savedRoutes.removeAll { $0.id == route.id }
+        saveSavedRoutes()
+        objectWillChange.send()
+        print("✅ 路線已移除: \(route.startLocation.name) → \(route.endLocation.name)")
+    }
+    
+    /// 檢查路線是否已保存
+    func isRouteSaved(_ route: TravelRoute) -> Bool {
+        return savedRoutes.contains(where: { $0.id == route.id })
+    }
+    
+    /// 清除所有已保存的路線
+    func clearSavedRoutes() {
+        savedRoutes.removeAll()
+        saveSavedRoutes()
+        objectWillChange.send()
+        print("✅ 所有已保存路線已清除")
+    }
+    
+    // MARK: - 其他方法
     
     func fetchRealTimeWeather() {
         // This will be handled by the WeatherService
