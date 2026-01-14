@@ -11,13 +11,17 @@ struct SettingsView: View {
     @State private var isDarkMode = false
     @State private var notificationsEnabled = true
     @State private var locationAccess = true
-    @State private var saveHistory = true
+    @AppStorage("saveHistory") private var saveHistory = true
     @State private var autoUpdate = true
     @State private var selectedLanguage = "English"
     @State private var selectedMapProvider = "Apple Maps"
     
     let languages = ["English", "Traditional Chinese", "Simplified Chinese"]
     let mapProviders = ["Apple Maps", "Google Maps"]
+    
+    @ObservedObject var travelDataManager = TravelDataManager.shared
+    @State private var showingClearHistoryAlert = false
+    @State private var showingClearFavoritesAlert = false
     
     var body: some View {
         List {
@@ -63,13 +67,6 @@ struct SettingsView: View {
                 }
                 
                 HStack {
-                    Image(systemName: "bell.fill")
-                        .foregroundColor(.red)
-                        .frame(width: 30)
-                    Toggle("Notifications", isOn: $notificationsEnabled)
-                }
-                
-                HStack {
                     Image(systemName: "location.fill")
                         .foregroundColor(.blue)
                         .frame(width: 30)
@@ -81,13 +78,9 @@ struct SettingsView: View {
                         .foregroundColor(.orange)
                         .frame(width: 30)
                     Toggle("Save History", isOn: $saveHistory)
-                }
-                
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.green)
-                        .frame(width: 30)
-                    Toggle("Auto Update Data", isOn: $autoUpdate)
+                        .onChange(of: saveHistory) { newValue in
+                            travelDataManager.setSaveHistory(newValue)
+                        }
                 }
             }
             
@@ -129,86 +122,40 @@ struct SettingsView: View {
                         Text("Transport Preferences")
                     }
                 }
-                
-                NavigationLink(destination: NotificationSettingsView()) {
+            }
+            
+            // Personal Data Section
+            Section(header: Text("Personal Data")) {
+                Button(action: {
+                    showingClearHistoryAlert = true
+                }) {
                     HStack {
-                        Image(systemName: "bell.badge.fill")
+                        Image(systemName: "trash.fill")
                             .foregroundColor(.red)
                             .frame(width: 30)
-                        Text("Notification Settings")
-                    }
-                }
-            }
-            
-            // Data & Storage Section
-            Section(header: Text("Data & Storage")) {
-                HStack {
-                    Image(systemName: "trash.fill")
-                        .foregroundColor(.gray)
-                        .frame(width: 30)
-                    Button("Clear Cache") {
-                        // Clear cache action
-                    }
-                    .foregroundColor(.primary)
-                }
-                
-                HStack {
-                    Image(systemName: "icloud.fill")
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
-                    Text("iCloud Sync")
-                    Spacer()
-                    Toggle("", isOn: .constant(true))
-                        .labelsHidden()
-                }
-                
-                NavigationLink(destination: DataUsageView()) {
-                    HStack {
-                        Image(systemName: "chart.bar.fill")
-                            .foregroundColor(.green)
-                            .frame(width: 30)
-                        Text("Data Usage")
-                    }
-                }
-            }
-            
-            // About Section
-            Section(header: Text("About")) {
-                HStack {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundColor(.blue)
-                        .frame(width: 30)
-                    Text("Version")
-                    Spacer()
-                    Text("1.0.0")
-                        .foregroundColor(.gray)
-                }
-                
-                NavigationLink(destination: TermsOfServiceView()) {
-                    HStack {
-                        Image(systemName: "doc.text.fill")
+                        Text("Clear History")
+                        Spacer()
+                        Text("\(travelDataManager.recentRoutes.count) items")
+                            .font(.caption)
                             .foregroundColor(.gray)
-                            .frame(width: 30)
-                        Text("Terms of Service")
                     }
+                    .foregroundColor(.red)
                 }
                 
-                NavigationLink(destination: PrivacyPolicyView()) {
+                Button(action: {
+                    showingClearFavoritesAlert = true
+                }) {
                     HStack {
-                        Image(systemName: "hand.raised.fill")
-                            .foregroundColor(.blue)
+                        Image(systemName: "star.slash.fill")
+                            .foregroundColor(.red)
                             .frame(width: 30)
-                        Text("Privacy Policy")
+                        Text("Clear Favorites")
+                        Spacer()
+                        Text("\(travelDataManager.getFavoriteLocations().count) items")
+                            .font(.caption)
+                            .foregroundColor(.gray)
                     }
-                }
-                
-                NavigationLink(destination: AboutView()) {
-                    HStack {
-                        Image(systemName: "questionmark.circle.fill")
-                            .foregroundColor(.green)
-                            .frame(width: 30)
-                        Text("About App")
-                    }
+                    .foregroundColor(.red)
                 }
             }
             
@@ -239,10 +186,26 @@ struct SettingsView: View {
         }
         .listStyle(InsetGroupedListStyle())
         .navigationTitle("Settings")
+        .alert("Clear History", isPresented: $showingClearHistoryAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All", role: .destructive) {
+                travelDataManager.clearHistory()
+            }
+        } message: {
+            Text("Are you sure you want to clear all history? This action cannot be undone.")
+        }
+        .alert("Clear Favorites", isPresented: $showingClearFavoritesAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All", role: .destructive) {
+                travelDataManager.clearFavorites()
+            }
+        } message: {
+            Text("Are you sure you want to clear all favorites? This action cannot be undone.")
+        }
     }
 }
 
-// MARK: - Subpages
+// MARK: - Subpages (保持原樣不變)
 struct TransportPreferenceView: View {
     @State private var preferredModes: [String: Bool] = [
         "MTR": true,

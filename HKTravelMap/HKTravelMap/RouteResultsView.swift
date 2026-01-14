@@ -10,323 +10,295 @@ import SwiftUI
 struct RouteResultsView: View {
     let routes: [TravelRoute]
     @Environment(\.presentationMode) var presentationMode
+    @Environment(\.colorScheme) var colorScheme
+    @State private var selectedRouteId: UUID?
+    @State private var expandedRouteId: UUID?
+    @State private var showShareSheet = false
+    @State private var showSaveConfirmation = false
+    @State private var isSaved = false
+    @State private var activeTab = 0
+    @State private var mapViewHeight: CGFloat = 300
+    @State private var showRouteDetails = false
+    
+    // 模擬導航狀態
+    @State private var isNavigating = false
+    @State private var navigationProgress: Double = 0.0
+    @State private var remainingTime: Int = 45
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Route Summary
-                if let firstRoute = routes.first {
-                    RouteSummaryView(route: firstRoute)
-                        .padding()
-                        .background(Color.hkBlue.opacity(0.1))
-                }
-                
-                // Routes List
-                ScrollView {
-                    VStack(spacing: 16) {
-                        ForEach(routes) { route in
-                            RouteCard(route: route)
-                        }
-                        
-                        // Additional Options
-                        VStack(spacing: 12) {
-                            Text("更多選項")
-                                .font(.headline)
-                                .foregroundColor(.hkBlue)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            HStack(spacing: 15) {
-                                RouteOptionButton(
-                                    icon: "clock.badge.exclamationmark",
-                                    title: "時間選項",
-                                    color: .orange
-                                ) {
-                                    // Time options
-                                }
-                                
-                                RouteOptionButton(
-                                    icon: "dollarsign.circle",
-                                    title: "價格比較",
-                                    color: .green
-                                ) {
-                                    // Price comparison
-                                }
-                                
-                                RouteOptionButton(
-                                    icon: "leaf",
-                                    title: "環保路線",
-                                    color: .green
-                                ) {
-                                    // Eco-friendly route
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
-                        .padding(.horizontal)
-                        
-                        // Weather Impact
-                        if let weatherImpact = routes.first?.weatherImpact {
-                            WeatherImpactView(impact: weatherImpact)
-                                .padding(.horizontal)
-                        }
-                        
-                        // Action Buttons
-                        VStack(spacing: 12) {
-                            Button(action: {
-                                // Start navigation
-                            }) {
-                                HStack {
-                                    Image(systemName: "play.fill")
-                                    Text("開始導航")
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.hkBlue)
-                                .foregroundColor(.white)
-                                .font(.headline)
-                                .cornerRadius(12)
-                            }
-                            
-                            Button(action: {
-                                // Save route
-                            }) {
-                                HStack {
-                                    Image(systemName: "star.fill")
-                                    Text("儲存路線")
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.yellow.opacity(0.2))
-                                .foregroundColor(.yellow)
-                                .font(.headline)
-                                .cornerRadius(12)
-                            }
-                            
-                            Button(action: {
-                                presentationMode.wrappedValue.dismiss()
-                            }) {
-                                Text("返回")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(Color.gray.opacity(0.1))
-                                    .foregroundColor(.gray)
-                                    .font(.headline)
-                                    .cornerRadius(12)
-                            }
-                        }
-                        .padding()
+            ScrollView {
+                VStack(spacing: 0) {
+                    // 路線摘要卡片
+                    if let firstRoute = routes.first {
+                        RouteSummaryCard(route: firstRoute)
+                            .padding(.horizontal)
+                            .padding(.top)
                     }
-                    .padding(.vertical)
+                    
+                    // 路線選項標籤
+                    if routes.count > 1 {
+                        RouteOptionsTabs(
+                            routes: routes,
+                            selectedRouteId: $selectedRouteId,
+                            expandedRouteId: $expandedRouteId
+                        )
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                    }
+                    
+                    // 詳細路線列表
+                    LazyVStack(spacing: 16) {
+                        ForEach(routes) { route in
+                            RouteDetailCard(
+                                route: route,
+                                isSelected: selectedRouteId == route.id,
+                                isExpanded: expandedRouteId == route.id,
+                                onSelect: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedRouteId = route.id
+                                        expandedRouteId = route.id
+                                    }
+                                },
+                                onExpand: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        expandedRouteId = expandedRouteId == route.id ? nil : route.id
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    
+                    // 額外選項
+                    AdditionalOptionsView()
+                        .padding(.horizontal)
+                        .padding(.top, 24)
+                    
+                    // 天氣影響
+                    if let weatherImpact = routes.first?.weatherImpact {
+                        WeatherImpactCard(impact: weatherImpact)
+                            .padding(.horizontal)
+                            .padding(.top, 16)
+                    }
+                    
+                    // 操作按鈕
+                    ActionButtonsView(
+                        isNavigating: $isNavigating,
+                        showShareSheet: $showShareSheet,
+                        showSaveConfirmation: $showSaveConfirmation,
+                        isSaved: $isSaved,
+                        onNavigate: startNavigation,
+                        onSave: saveRoute,
+                        onClose: { presentationMode.wrappedValue.dismiss() }
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 24)
+                    .padding(.bottom, 30)
                 }
-                .background(Color.lightBackground)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationBarTitle("路線結果", displayMode: .inline)
             .navigationBarItems(trailing: Button("關閉") {
                 presentationMode.wrappedValue.dismiss()
             })
+            .sheet(isPresented: $showRouteDetails) {
+                if let route = routes.first(where: { $0.id == selectedRouteId }) {
+                    RouteDetailsFullView(route: route)
+                }
+            }
+            .overlay {
+                if isNavigating {
+                    NavigationOverlay(
+                        progress: navigationProgress,
+                        remainingTime: remainingTime,
+                        onCancel: cancelNavigation
+                    )
+                }
+            }
+            .onAppear {
+                if let firstRoute = routes.first {
+                    selectedRouteId = firstRoute.id
+                }
+                
+                // 初始化模擬數據
+                setupMockData()
+            }
         }
     }
-}
-
-struct RouteSummaryView: View {
-    let route: TravelRoute
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(route.startLocation.name)
-                        .font(.headline)
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down")
-                            .font(.caption)
-                        Text(route.endLocation.name)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+    private func setupMockData() {
+        // 設置模擬導航進度
+        navigationProgress = 0.0
+        remainingTime = routes.first?.duration ?? 45
+    }
+    
+    private func startNavigation() {
+        withAnimation(.spring()) {
+            isNavigating = true
+        }
+        
+        // 模擬導航進度
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            if navigationProgress < 1.0 {
+                withAnimation(.linear(duration: 1.0)) {
+                    navigationProgress += 0.01
+                    remainingTime -= 1
+                }
+            } else {
+                timer.invalidate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring()) {
+                        isNavigating = false
                     }
                 }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing) {
-                    Text("\(route.duration) 分鐘")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.hkBlue)
-                    Text("預計時間")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
             }
-            
-            // Transport Mode Tags
-            HStack(spacing: 8) {
-                ForEach(route.transportationModes, id: \.self) { mode in
-                    TransportModeTag(mode: mode)
-                }
+        }
+    }
+    
+    private func cancelNavigation() {
+        withAnimation(.spring()) {
+            isNavigating = false
+            navigationProgress = 0.0
+            remainingTime = routes.first?.duration ?? 45
+        }
+    }
+    
+    private func saveRoute() {
+        withAnimation(.spring()) {
+            isSaved = true
+        }
+        
+        // 顯示保存確認
+        showSaveConfirmation = true
+        
+        // 3秒後恢復
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation(.easeOut) {
+                showSaveConfirmation = false
             }
         }
     }
 }
 
-struct RouteCard: View {
+// MARK: - 路線摘要卡片
+struct RouteSummaryCard: View {
     let route: TravelRoute
-    @State private var isExpanded = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Card Header
-            HStack {
+        VStack(spacing: 16) {
+            // 起點終點
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("選項 \(route.id.uuidString.prefix(4))")
-                        .font(.headline)
-                        .foregroundColor(.hkBlue)
-                    
-                    HStack(spacing: 8) {
-                        Label("\(route.duration) 分鐘", systemImage: "clock")
-                            .font(.caption)
-                            .foregroundColor(.accentOrange)
-                        
-                        Label("\(calculateCost(for: route)) HKD", systemImage: "dollarsign.circle")
-                            .font(.caption)
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
                             .foregroundColor(.green)
-                    }
-                }
-                
-                Spacer()
-                
-                Button(action: { isExpanded.toggle() }) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundColor(.gray)
-                }
-            }
-            .padding()
-            .background(Color.white)
-            
-            // Expanded Details
-            if isExpanded {
-                VStack(spacing: 12) {
-                    ForEach(route.steps) { step in
-                        RouteStepView(step: step)
-                    }
-                    
-                    if let impact = route.weatherImpact {
-                        HStack {
-                            Image(systemName: "cloud.sun.fill")
-                                .foregroundColor(.blue)
-                            Text("天氣影響: \(impact)")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
+                            .font(.title3)
+                        
+                        Text(route.startLocation.name)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
                     }
                     
                     HStack {
-                        Button(action: {
-                            // Select this route
-                        }) {
-                            Text("選擇此路線")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Color.hkBlue)
-                                .foregroundColor(.white)
-                                .font(.caption)
-                                .cornerRadius(6)
-                        }
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 2, height: 20)
+                            .padding(.leading, 11)
                         
-                        Button(action: {
-                            // Share route
-                        }) {
-                            Text("分享")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(Color.gray.opacity(0.1))
-                                .foregroundColor(.gray)
-                                .font(.caption)
-                                .cornerRadius(6)
+                        Text(route.endLocation.name)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                // 時間和費用
+                VStack(alignment: .trailing, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("\(route.duration)")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.hkBlue)
+                        
+                        Text("分鐘")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Text("約 HK$ \(calculateTotalFare())")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+            
+            // 交通方式標籤
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(route.transportationModes, id: \.self) { mode in
+                        TransportModeCapsule(mode: mode)
+                    }
+                    
+                    // 天氣標籤
+                    if let impact = route.weatherImpact {
+                        if impact.contains("雨") {
+                            WeatherCapsule(icon: "cloud.rain", text: "雨天", color: .blue)
+                        } else if impact.contains("熱") {
+                            WeatherCapsule(icon: "sun.max", text: "炎熱", color: .orange)
                         }
                     }
-                    .padding(.horizontal)
                 }
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
             }
         }
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 3, x: 0, y: 1)
-        .padding(.horizontal)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.08), radius: 15, x: 0, y: 5)
+        )
     }
     
-    private func calculateCost(for route: TravelRoute) -> Int {
-        // Simple cost calculation
-        var cost = 0
+    private func calculateTotalFare() -> Int {
+        // 簡單計算總費用
+        var total = 0
         for step in route.steps {
             switch step.transportMode {
-            case "MTR": cost += 8
-            case "Bus": cost += 6
-            case "Minibus": cost += 7
-            case "Tram": cost += 3
-            case "Ferry": cost += 5
-            case "Taxi": cost += 50
-            default: cost += 0
+            case "MTR": total += 8
+            case "Bus": total += 6
+            case "Minibus": total += 7
+            case "Tram": total += 3
+            case "Ferry": total += 5
+            case "Taxi": total += 50
+            default: total += 0
             }
         }
-        return cost
+        return total
     }
 }
 
-struct RouteStepView: View {
-    let step: RouteStep
+// MARK: - 交通方式膠囊標籤
+struct TransportModeCapsule: View {
+    let mode: String
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(colorForTransport(step.transportMode))
-                    .frame(width: 36, height: 36)
-                
-                Image(systemName: iconForTransport(step.transportMode))
-                    .font(.system(size: 16))
-                    .foregroundColor(.white)
-            }
+        HStack(spacing: 4) {
+            Image(systemName: iconForTransport(mode))
+                .font(.caption2)
+                .foregroundColor(.white)
             
-            // Details
-            VStack(alignment: .leading, spacing: 2) {
-                Text(step.instruction)
-                    .font(.subheadline)
-                
-                HStack(spacing: 12) {
-                    if let lineNumber = step.lineNumber {
-                        Text(lineNumber)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.hkBlue.opacity(0.1))
-                            .foregroundColor(.hkBlue)
-                            .cornerRadius(4)
-                    }
-                    
-                    if let distance = step.distance {
-                        Text(String(format: "%.1f 公里", distance))
-                            .font(.caption2)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Text("\(step.duration) 分鐘")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                }
-            }
-            
-            Spacer()
+            Text(mode)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(colorForTransport(mode))
+        .cornerRadius(12)
     }
     
     private func iconForTransport(_ mode: String) -> String {
@@ -356,27 +328,357 @@ struct RouteStepView: View {
     }
 }
 
-struct TransportModeTag: View {
-    let mode: String
+// MARK: - 天氣膠囊標籤
+struct WeatherCapsule: View {
+    let icon: String
+    let text: String
+    let color: Color
     
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: iconForTransport(mode))
+            Image(systemName: icon)
                 .font(.caption2)
-            Text(mode)
+                .foregroundColor(.white)
+            
+            Text(text)
                 .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(colorForTransport(mode).opacity(0.1))
-        .foregroundColor(colorForTransport(mode))
-        .cornerRadius(8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(color)
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - 路線選項標籤
+struct RouteOptionsTabs: View {
+    let routes: [TravelRoute]
+    @Binding var selectedRouteId: UUID?
+    @Binding var expandedRouteId: UUID?
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(routes) { route in
+                    RouteOptionTab(
+                        route: route,
+                        isSelected: selectedRouteId == route.id,
+                        isExpanded: expandedRouteId == route.id,
+                        onSelect: {
+                            selectedRouteId = route.id
+                        },
+                        onExpand: {
+                            expandedRouteId = expandedRouteId == route.id ? nil : route.id
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+struct RouteOptionTab: View {
+    let route: TravelRoute
+    let isSelected: Bool
+    let isExpanded: Bool
+    let onSelect: () -> Void
+    let onExpand: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    // 路線時間和編號
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("路線 \(route.id.uuidString.prefix(4))")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(isSelected ? .white : .secondary)
+                        
+                        Text("\(route.duration)分鐘")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(isSelected ? .white : .primary)
+                    }
+                    
+                    Spacer()
+                    
+                    // 展開/摺疊按鈕
+                    Button(action: onExpand) {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(isSelected ? .white : .gray)
+                            .frame(width: 20, height: 20)
+                            .background(isSelected ? Color.white.opacity(0.2) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                // 費用
+                Text("HK$ \(calculateFare(for: route))")
+                    .font(.caption)
+                    .foregroundColor(isSelected ? .white : .orange)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(minWidth: 120)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(isSelected ? Color.hkBlue : Color(.systemGray6))
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func calculateFare(for route: TravelRoute) -> Int {
+        var total = 0
+        for step in route.steps {
+            switch step.transportMode {
+            case "MTR": total += 8
+            case "Bus": total += 6
+            case "Minibus": total += 7
+            case "Tram": total += 3
+            case "Ferry": total += 5
+            case "Taxi": total += 50
+            default: total += 0
+            }
+        }
+        return total
+    }
+}
+
+// MARK: - 路線詳細卡片
+struct RouteDetailCard: View {
+    let route: TravelRoute
+    let isSelected: Bool
+    let isExpanded: Bool
+    let onSelect: () -> Void
+    let onExpand: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 卡片標題
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(isSelected ? Color.hkBlue : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                        
+                        Text("路線 \(route.id.uuidString.prefix(4))")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Label("\(route.duration)分鐘", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundColor(.accentOrange)
+                        
+                        Label("HK$ \(calculateFare())", systemImage: "dollarsign.circle")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        
+                        Label("\(countTransfers())次轉乘", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                    }
+                }
+                
+                Spacer()
+                
+                // 選擇指示器
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.hkBlue)
+                }
+                
+                // 展開按鈕
+                Button(action: onExpand) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.body)
+                        .foregroundColor(.gray)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(Color(.systemBackground))
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onSelect)
+            
+            // 展開的詳細內容
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider()
+                        .padding(.horizontal)
+                    
+                    // 路線步驟
+                    VStack(spacing: 0) {
+                        ForEach(Array(route.steps.enumerated()), id: \.element.id) { index, step in
+                            RouteStepRow(step: step, isLast: index == route.steps.count - 1)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    
+                    Divider()
+                        .padding(.horizontal)
+                    
+                    // 操作按鈕
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            // 選擇此路線
+                            onSelect()
+                        }) {
+                            Text("選擇此路線")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.hkBlue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        
+                        Button(action: {
+                            // 分享路線
+                        }) {
+                            Text("分享")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.gray.opacity(0.1))
+                                .foregroundColor(.gray)
+                                .cornerRadius(8)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+                .background(Color(.systemBackground))
+            }
+        }
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isSelected ? Color.hkBlue.opacity(0.3) : Color.clear, lineWidth: 2)
+        )
+    }
+    
+    private func calculateFare() -> Int {
+        var total = 0
+        for step in route.steps {
+            switch step.transportMode {
+            case "MTR": total += 8
+            case "Bus": total += 6
+            case "Minibus": total += 7
+            case "Tram": total += 3
+            case "Ferry": total += 5
+            case "Taxi": total += 50
+            default: total += 0
+            }
+        }
+        return total
+    }
+    
+    private func countTransfers() -> Int {
+        return route.steps.filter { $0.transportMode != "Walk" }.count - 1
+    }
+}
+
+// MARK: - 路線步驟行
+struct RouteStepRow: View {
+    let step: RouteStep
+    let isLast: Bool
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            // 時間線
+            VStack(spacing: 0) {
+                // 頂部圓點
+                Circle()
+                    .fill(colorForTransport(step.transportMode))
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white, lineWidth: 2)
+                    )
+                
+                // 連接線
+                if !isLast {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 2)
+                        .frame(maxHeight: .infinity)
+                }
+            }
+            .frame(width: 24)
+            
+            // 步驟詳細信息
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(step.instruction)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                    
+                    Spacer()
+                    
+                    Text("\(step.duration)分鐘")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.accentOrange)
+                }
+                
+                // 交通工具信息
+                HStack(spacing: 8) {
+                    if let lineNumber = step.lineNumber {
+                        Text(lineNumber)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(colorForTransport(step.transportMode).opacity(0.1))
+                            .foregroundColor(colorForTransport(step.transportMode))
+                            .cornerRadius(4)
+                    }
+                    
+                    if let platform = step.platform {
+                        Text("月台 \(platform)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let distance = step.distance {
+                        Text("\(String(format: "%.1f", distance))公里")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // 交通工具圖標
+            Image(systemName: iconForTransport(step.transportMode))
+                .font(.title3)
+                .foregroundColor(colorForTransport(step.transportMode))
+                .frame(width: 32)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
     
     private func iconForTransport(_ mode: String) -> String {
         switch mode {
         case "MTR": return "train.side.front.car"
         case "Bus": return "bus"
+        case "Minibus": return "bus.doubledecker"
+        case "Tram": return "tram"
+        case "Ferry": return "ferry"
+        case "Taxi": return "car"
         case "Walk": return "figure.walk"
         default: return "questionmark"
         }
@@ -386,60 +688,488 @@ struct TransportModeTag: View {
         switch mode {
         case "MTR": return .red
         case "Bus": return .green
+        case "Minibus": return .orange
+        case "Tram": return .blue
+        case "Ferry": return .purple
+        case "Taxi": return .yellow
         case "Walk": return .gray
-        default: return .blue
+        default: return .black
         }
     }
 }
 
-struct WeatherImpactView: View {
-    let impact: String
+// MARK: - 額外選項視圖
+struct AdditionalOptionsView: View {
+    @State private var selectedOption = 0
+    
+    let options = [
+        ("clock.badge.exclamationmark", "時間選項", Color.orange),
+        ("dollarsign.circle", "價格比較", Color.green),
+        ("leaf", "環保路線", Color.green),
+        ("arrow.triangle.swap", "替代路線", Color.blue)
+    ]
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.title2)
-                .foregroundColor(.orange)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("更多選項")
+                .font(.headline)
+                .foregroundColor(.hkBlue)
+                .padding(.horizontal)
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text("旅行建議")
-                    .font(.headline)
-                Text(impact)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                ForEach(options.indices, id: \.self) { index in
+                    AdditionalOptionButton(
+                        icon: options[index].0,
+                        title: options[index].1,
+                        color: options[index].2,
+                        isSelected: selectedOption == index,
+                        action: {
+                            selectedOption = index
+                            // 執行相應操作
+                        }
+                    )
+                }
             }
-            
-            Spacer()
+            .padding(.horizontal)
         }
-        .padding()
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(12)
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
-struct RouteOptionButton: View {
+struct AdditionalOptionButton: View {
     let icon: String
     let title: String
     let color: Color
+    let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(isSelected ? 0.2 : 0.1))
+                        .frame(width: 44, height: 44)
+                    
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(color)
+                }
                 
                 Text(title)
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .cornerRadius(10)
-            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - 天氣影響卡片
+struct WeatherImpactCard: View {
+    let impact: String
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: weatherIcon(for: impact))
+                .font(.title2)
+                .foregroundColor(weatherColor(for: impact))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("旅行建議")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(impact)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Spacer()
+        }
+        .padding(20)
+        .background(weatherColor(for: impact).opacity(0.1))
+        .cornerRadius(16)
+    }
+    
+    private func weatherIcon(for impact: String) -> String {
+        if impact.contains("雨") {
+            return "cloud.rain.fill"
+        } else if impact.contains("熱") {
+            return "sun.max.fill"
+        } else if impact.contains("冷") {
+            return "thermometer.snowflake"
+        } else {
+            return "exclamationmark.triangle.fill"
+        }
+    }
+    
+    private func weatherColor(for impact: String) -> Color {
+        if impact.contains("雨") {
+            return .blue
+        } else if impact.contains("熱") {
+            return .orange
+        } else if impact.contains("冷") {
+            return .blue
+        } else {
+            return .yellow
+        }
+    }
+}
+
+// MARK: - 操作按鈕視圖
+struct ActionButtonsView: View {
+    @Binding var isNavigating: Bool
+    @Binding var showShareSheet: Bool
+    @Binding var showSaveConfirmation: Bool
+    @Binding var isSaved: Bool
+    let onNavigate: () -> Void
+    let onSave: () -> Void
+    let onClose: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // 導航按鈕
+            Button(action: {
+                if !isNavigating {
+                    onNavigate()
+                }
+            }) {
+                HStack {
+                    if isNavigating {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.headline)
+                    }
+                    
+                    Text(isNavigating ? "導航中..." : "開始導航")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.hkBlue, Color.hkBlue.opacity(0.8)]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .foregroundColor(.white)
+                .font(.headline)
+                .cornerRadius(12)
+                .shadow(color: .hkBlue.opacity(0.3), radius: 5, x: 0, y: 3)
+            }
+            
+            HStack(spacing: 12) {
+                // 保存按鈕
+                Button(action: onSave) {
+                    HStack {
+                        Image(systemName: isSaved ? "checkmark" : "star.fill")
+                            .font(.headline)
+                        
+                        Text(isSaved ? "已保存" : "保存路線")
+                            .fontWeight(.medium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.yellow.opacity(isSaved ? 0.3 : 0.2))
+                    .foregroundColor(isSaved ? .green : .yellow)
+                    .font(.headline)
+                    .cornerRadius(12)
+                }
+                
+                // 分享按鈕
+                Button(action: { showShareSheet = true }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.headline)
+                        
+                        Text("分享")
+                            .fontWeight(.medium)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.purple.opacity(0.1))
+                    .foregroundColor(.purple)
+                    .font(.headline)
+                    .cornerRadius(12)
+                }
+            }
+            
+            // 返回按鈕
+            Button(action: onClose) {
+                Text("返回")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.gray.opacity(0.1))
+                    .foregroundColor(.gray)
+                    .font(.headline)
+                    .cornerRadius(12)
+            }
+            
+            // 保存確認提示
+            if showSaveConfirmation {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    
+                    Text("路線已保存到收藏")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(8)
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
+// MARK: - 導航覆蓋層
+struct NavigationOverlay: View {
+    let progress: Double
+    let remainingTime: Int
+    let onCancel: () -> Void
+    
+    var body: some View {
+        ZStack {
+            // 半透明背景
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 24) {
+                // 進度環
+                ZStack {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                        .frame(width: 120, height: 120)
+                    
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [.green, .blue]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .frame(width: 120, height: 120)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1.0), value: progress)
+                    
+                    VStack(spacing: 4) {
+                        Text("\(remainingTime)")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("分鐘")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                
+                // 導航信息
+                VStack(spacing: 8) {
+                    Text("導航進行中")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("請按照指示前進")
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                // 取消按鈕
+                Button(action: onCancel) {
+                    Text("取消導航")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 12)
+                        .background(Color.red.opacity(0.3))
+                        .cornerRadius(10)
+                }
+            }
+            .padding(40)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color(.systemBackground).opacity(0.9))
+            )
+            .padding(40)
+        }
+    }
+}
+
+// MARK: - 完整路線詳細視圖
+struct RouteDetailsFullView: View {
+    let route: TravelRoute
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // 路線摘要
+                    RouteSummaryCard(route: route)
+                        .padding(.horizontal)
+                        .padding(.top)
+                    
+                    // 詳細步驟
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("詳細步驟")
+                            .font(.headline)
+                            .foregroundColor(.hkBlue)
+                            .padding(.horizontal)
+                        
+                        ForEach(route.steps) { step in
+                            RouteStepDetailCard(step: step)
+                                .padding(.horizontal)
+                        }
+                    }
+                    
+                    // 旅行提示
+                    if let notes = route.notes {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("注意事項")
+                                .font(.headline)
+                                .foregroundColor(.hkBlue)
+                                .padding(.horizontal)
+                            
+                            Text(notes)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                                .padding(.horizontal)
+                        }
+                    }
+                }
+                .padding(.bottom, 30)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("路線詳情")
+            .navigationBarItems(trailing: Button("完成") {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
+    }
+}
+
+struct RouteStepDetailCard: View {
+    let step: RouteStep
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: iconForTransport(step.transportMode))
+                    .font(.title2)
+                    .foregroundColor(colorForTransport(step.transportMode))
+                    .frame(width: 40)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(step.instruction)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    if let lineNumber = step.lineNumber {
+                        Text(lineNumber)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(step.duration)分鐘")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.accentOrange)
+                    
+                    if let distance = step.distance {
+                        Text("\(String(format: "%.1f", distance))公里")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            HStack {
+                if let platform = step.platform {
+                    Label("月台 \(platform)", systemImage: "signpost.right")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+                
+                if let stopName = step.stopName {
+                    Label(stopName, systemImage: "mappin.circle")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                
+                Spacer()
+                
+                Text(step.transportMode)
+                    .font(.caption2)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(colorForTransport(step.transportMode).opacity(0.1))
+                    .foregroundColor(colorForTransport(step.transportMode))
+                    .cornerRadius(6)
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
+    }
+    
+    private func iconForTransport(_ mode: String) -> String {
+        switch mode {
+        case "MTR": return "train.side.front.car"
+        case "Bus": return "bus"
+        case "Minibus": return "bus.doubledecker"
+        case "Tram": return "tram"
+        case "Ferry": return "ferry"
+        case "Taxi": return "car"
+        case "Walk": return "figure.walk"
+        default: return "questionmark"
+        }
+    }
+    
+    private func colorForTransport(_ mode: String) -> Color {
+        switch mode {
+        case "MTR": return .red
+        case "Bus": return .green
+        case "Minibus": return .orange
+        case "Tram": return .blue
+        case "Ferry": return .purple
+        case "Taxi": return .yellow
+        case "Walk": return .gray
+        default: return .black
         }
     }
 }

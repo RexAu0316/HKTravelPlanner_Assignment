@@ -50,6 +50,7 @@ struct RouteStep: Identifiable, Codable {
     var distance: Double? // kilometers
     var lineNumber: String?
     var stopName: String?
+    var platform: String?
 }
 
 struct WeatherData: Codable {
@@ -81,6 +82,13 @@ struct WeatherData: Codable {
     }
 }
 
+// MARK: - UserDefaults Keys
+extension UserDefaults {
+    static let recentRoutesKey = "recentTravelRoutes"
+    static let favoriteLocationIDsKey = "favoriteLocationIDs"
+    static let saveHistoryKey = "saveHistoryPreference"
+}
+
 // MARK: - Travel Data Manager
 class TravelDataManager: ObservableObject {
     static let shared = TravelDataManager()
@@ -96,7 +104,7 @@ class TravelDataManager: ObservableObject {
             address: "Central, Hong Kong Island",
             latitude: 22.2819,
             longitude: 114.1586,
-            isFavorite: true,
+            isFavorite: false,
             category: "Transport Hub"
         ),
         Location(
@@ -104,7 +112,7 @@ class TravelDataManager: ObservableObject {
             address: "1 Matheson Street, Causeway Bay, Hong Kong",
             latitude: 22.2804,
             longitude: 114.1830,
-            isFavorite: true,
+            isFavorite: false,
             category: "Shopping"
         ),
         Location(
@@ -142,7 +150,7 @@ class TravelDataManager: ObservableObject {
             address: "8 Argyle Street, Mong Kok, Kowloon",
             latitude: 22.3175,
             longitude: 114.1694,
-            isFavorite: true,
+            isFavorite: false,
             category: "Shopping"
         ),
         Location(
@@ -198,82 +206,14 @@ class TravelDataManager: ObservableObject {
             address: "Shop 12A, Hong Kong Station, Central",
             latitude: 22.2847,
             longitude: 114.1592,
-            isFavorite: true,
+            isFavorite: false,
             category: "Dining"
         )
     ]
     
-    let recentRoutes: [TravelRoute] = [
-        TravelRoute(
-            startLocation: Location(
-                name: "Tsim Sha Tsui",
-                address: "Tsim Sha Tsui MTR Station",
-                category: "Transport Hub"
-            ),
-            endLocation: Location(
-                name: "Central",
-                address: "Central MTR Station",
-                category: "Transport Hub"
-            ),
-            departureTime: Date().addingTimeInterval(-3600),
-            estimatedArrivalTime: Date().addingTimeInterval(-3300),
-            duration: 30,
-            transportationModes: ["MTR", "Walk"],
-            steps: [
-                RouteStep(
-                    instruction: "Take Tsuen Wan Line from Tsim Sha Tsui Station",
-                    transportMode: "MTR",
-                    duration: 8,
-                    lineNumber: "Tsuen Wan Line",
-                    stopName: "Tsim Sha Tsui Station"
-                ),
-                RouteStep(
-                    instruction: "Walk to Exit A",
-                    transportMode: "Walk",
-                    duration: 5,
-                    distance: 0.3
-                )
-            ],
-            weatherImpact: "Good weather, recommended walking"
-        ),
-        TravelRoute(
-            startLocation: Location(
-                name: "Causeway Bay",
-                address: "Times Square, Causeway Bay",
-                category: "Shopping"
-            ),
-            endLocation: Location(
-                name: "Mong Kok",
-                address: "Langham Place, Mong Kok",
-                category: "Shopping"
-            ),
-            departureTime: Date().addingTimeInterval(-7200),
-            estimatedArrivalTime: Date().addingTimeInterval(-6600),
-            duration: 45,
-            transportationModes: ["MTR", "Walk"],
-            steps: [
-                RouteStep(
-                    instruction: "Walk to Causeway Bay Station",
-                    transportMode: "Walk",
-                    duration: 8,
-                    distance: 0.5
-                ),
-                RouteStep(
-                    instruction: "Take Island Line to Admiralty",
-                    transportMode: "MTR",
-                    duration: 5,
-                    lineNumber: "Island Line"
-                ),
-                RouteStep(
-                    instruction: "Transfer to Tsuen Wan Line to Mong Kok",
-                    transportMode: "MTR",
-                    duration: 15,
-                    lineNumber: "Tsuen Wan Line"
-                )
-            ],
-            weatherImpact: "Light rain expected, bring umbrella"
-        )
-    ]
+    // 從 UserDefaults 加載的歷史記錄
+    @Published var recentRoutes: [TravelRoute] = []
+    private var favoriteLocationIDs: Set<UUID> = []
     
     private init() {
         // 初始化一個默認的天氣數據
@@ -288,15 +228,242 @@ class TravelDataManager: ObservableObject {
             icon: nil
         )
         
+        // 加載保存的數據
+        loadSavedData()
+        
         // 自動加載天氣數據
         self.fetchRealTimeWeather()
     }
     
+    // MARK: - 數據持久化方法
+    
+    /// 加載保存的數據
+    private func loadSavedData() {
+        loadRecentRoutes()
+        loadFavoriteLocations()
+    }
+    
+    /// 加載最近搜索路線
+    private func loadRecentRoutes() {
+        if let data = UserDefaults.standard.data(forKey: UserDefaults.recentRoutesKey) {
+            let decoder = JSONDecoder()
+            if let routes = try? decoder.decode([TravelRoute].self, from: data) {
+                recentRoutes = routes
+            }
+        } else {
+            // 如果沒有保存的數據，使用示例數據
+            recentRoutes = createSampleRecentRoutes()
+        }
+    }
+    
+    /// 加載收藏地點
+    private func loadFavoriteLocations() {
+        if let data = UserDefaults.standard.data(forKey: UserDefaults.favoriteLocationIDsKey) {
+            let decoder = JSONDecoder()
+            if let ids = try? decoder.decode([UUID].self, from: data) {
+                favoriteLocationIDs = Set(ids)
+                // 更新 locations 中的收藏狀態
+                for index in locations.indices {
+                    if favoriteLocationIDs.contains(locations[index].id) {
+                        locations[index].isFavorite = true
+                    }
+                }
+            }
+        }
+    }
+    
+    /// 保存最近搜索路線
+    private func saveRecentRoutes() {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(recentRoutes) {
+            UserDefaults.standard.set(encoded, forKey: UserDefaults.recentRoutesKey)
+        }
+    }
+    
+    /// 保存收藏地點
+    private func saveFavoriteLocations() {
+        let encoder = JSONEncoder()
+        let ids = Array(favoriteLocationIDs)
+        if let encoded = try? encoder.encode(ids) {
+            UserDefaults.standard.set(encoded, forKey: UserDefaults.favoriteLocationIDsKey)
+        }
+    }
+    
+    /// 創建示例歷史記錄
+    private func createSampleRecentRoutes() -> [TravelRoute] {
+        return [
+            TravelRoute(
+                startLocation: Location(
+                    name: "Tsim Sha Tsui",
+                    address: "Tsim Sha Tsui MTR Station",
+                    latitude: 22.2970,
+                    longitude: 114.1715,
+                    isFavorite: false,
+                    category: "Transport Hub"
+                ),
+                endLocation: Location(
+                    name: "Central",
+                    address: "Central MTR Station",
+                    latitude: 22.2819,
+                    longitude: 114.1586,
+                    isFavorite: false,
+                    category: "Transport Hub"
+                ),
+                departureTime: Date().addingTimeInterval(-3600),
+                estimatedArrivalTime: Date().addingTimeInterval(-3300),
+                duration: 30,
+                transportationModes: ["MTR", "Walk"],
+                steps: [
+                    RouteStep(
+                        instruction: "Take Tsuen Wan Line from Tsim Sha Tsui Station",
+                        transportMode: "MTR",
+                        duration: 8,
+                        distance: nil,
+                        lineNumber: "Tsuen Wan Line",
+                        stopName: "Tsim Sha Tsui Station",
+                        platform: "Platform 2"
+                    ),
+                    RouteStep(
+                        instruction: "Walk to Exit A",
+                        transportMode: "Walk",
+                        duration: 5,
+                        distance: 0.3,
+                        lineNumber: nil,
+                        stopName: nil,
+                        platform: nil
+                    )
+                ],
+                weatherImpact: "Good weather, recommended walking",
+                notes: "Avoid rush hours"
+            ),
+            TravelRoute(
+                startLocation: Location(
+                    name: "Causeway Bay",
+                    address: "Times Square, Causeway Bay",
+                    latitude: 22.2804,
+                    longitude: 114.1830,
+                    isFavorite: false,
+                    category: "Shopping"
+                ),
+                endLocation: Location(
+                    name: "Mong Kok",
+                    address: "Langham Place, Mong Kok",
+                    latitude: 22.3175,
+                    longitude: 114.1694,
+                    isFavorite: false,
+                    category: "Shopping"
+                ),
+                departureTime: Date().addingTimeInterval(-7200),
+                estimatedArrivalTime: Date().addingTimeInterval(-6600),
+                duration: 45,
+                transportationModes: ["MTR", "Walk"],
+                steps: [
+                    RouteStep(
+                        instruction: "Walk to Causeway Bay Station",
+                        transportMode: "Walk",
+                        duration: 8,
+                        distance: 0.5,
+                        lineNumber: nil,
+                        stopName: nil,
+                        platform: nil
+                    ),
+                    RouteStep(
+                        instruction: "Take Island Line to Admiralty",
+                        transportMode: "MTR",
+                        duration: 5,
+                        distance: 2.0,
+                        lineNumber: "Island Line",
+                        stopName: "Admiralty Station",
+                        platform: "Platform 3"
+                    ),
+                    RouteStep(
+                        instruction: "Transfer to Tsuen Wan Line to Mong Kok",
+                        transportMode: "MTR",
+                        duration: 15,
+                        distance: 6.5,
+                        lineNumber: "Tsuen Wan Line",
+                        stopName: "Mong Kok Station",
+                        platform: "Platform 1"
+                    )
+                ],
+                weatherImpact: "Light rain expected, bring umbrella",
+                notes: "Use Octopus card for discount"
+            )
+        ]
+    }
+    
+    // MARK: - 公開方法
+    
+    /// 添加路線到最近搜索
+    func addRecentRoute(_ route: TravelRoute) {
+        // 移除可能存在的重複路線（基於起點和終點）
+        recentRoutes.removeAll { existingRoute in
+            existingRoute.startLocation.name == route.startLocation.name &&
+            existingRoute.endLocation.name == route.endLocation.name
+        }
+        
+        // 將新路線添加到開頭
+        recentRoutes.insert(route, at: 0)
+        
+        // 限制最多保存10條記錄
+        if recentRoutes.count > 10 {
+            recentRoutes = Array(recentRoutes.prefix(10))
+        }
+        
+        // 保存到 UserDefaults
+        saveRecentRoutes()
+        
+        // 通知視圖更新
+        objectWillChange.send()
+    }
+    
+    /// 更新收藏狀態
     func updateFavoriteStatus(for locationId: UUID, isFavorite: Bool) {
         if let index = locations.firstIndex(where: { $0.id == locationId }) {
             locations[index].isFavorite = isFavorite
+            
+            if isFavorite {
+                // 添加到收藏集合
+                favoriteLocationIDs.insert(locationId)
+            } else {
+                // 從收藏集合移除
+                favoriteLocationIDs.remove(locationId)
+            }
+            
+            // 保存收藏列表
+            saveFavoriteLocations()
+            
+            // 通知視圖更新
             objectWillChange.send()
         }
+    }
+    
+    /// 獲取收藏地點
+    func getFavoriteLocations() -> [Location] {
+        return locations.filter { favoriteLocationIDs.contains($0.id) }
+    }
+    
+    /// 獲取最近的搜索路線（按時間排序）
+    func getRecentRoutes() -> [TravelRoute] {
+        return recentRoutes.sorted { $0.departureTime > $1.departureTime }
+    }
+    
+    /// 清除歷史記錄
+    func clearHistory() {
+        recentRoutes.removeAll()
+        saveRecentRoutes()
+        objectWillChange.send()
+    }
+    
+    /// 清除收藏
+    func clearFavorites() {
+        favoriteLocationIDs.removeAll()
+        // 更新所有 locations 的收藏狀態
+        for index in locations.indices {
+            locations[index].isFavorite = false
+        }
+        saveFavoriteLocations()
+        objectWillChange.send()
     }
     
     func fetchRealTimeWeather() {
@@ -332,16 +499,23 @@ class TravelDataManager: ObservableObject {
                         instruction: "Walk to MTR Station",
                         transportMode: "Walk",
                         duration: 8,
-                        distance: 0.6
+                        distance: 0.6,
+                        lineNumber: nil,
+                        stopName: nil,
+                        platform: nil
                     ),
                     RouteStep(
                         instruction: "Take Island Line to Central",
                         transportMode: "MTR",
                         duration: 15,
-                        lineNumber: "Island Line"
+                        distance: 5.2,
+                        lineNumber: "Island Line",
+                        stopName: "Central Station",
+                        platform: "Platform 1"
                     )
                 ],
-                weatherImpact: "Light rain expected, bring umbrella"
+                weatherImpact: "Light rain expected, bring umbrella",
+                notes: "Use Octopus card for convenience"
             )
         ]
     }
@@ -354,6 +528,16 @@ class TravelDataManager: ObservableObject {
             let distance = userLocation.distance(from: locationPoint) / 1000 // Convert to kilometers
             return distance <= radius
         }
+    }
+    
+    /// 檢查是否保存歷史記錄
+    func shouldSaveHistory() -> Bool {
+        return UserDefaults.standard.bool(forKey: UserDefaults.saveHistoryKey)
+    }
+    
+    /// 設置是否保存歷史記錄
+    func setSaveHistory(_ save: Bool) {
+        UserDefaults.standard.set(save, forKey: UserDefaults.saveHistoryKey)
     }
 }
 
