@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import MapKit
+import CoreLocation
 
 struct RouteResultsView: View {
     let routes: [TravelRoute]
@@ -23,10 +25,10 @@ struct RouteResultsView: View {
     // 添加 TravelDataManager 觀察對象
     @ObservedObject var travelDataManager = TravelDataManager.shared
     
-    // 模擬導航狀態
-    @State private var isNavigating = false
-    @State private var navigationProgress: Double = 0.0
-    @State private var remainingTime: Int = 45
+    // 新增：顯示導航選項
+    @State private var showNavigationOptions = false
+    @State private var showAppleMapsAlert = false
+    @State private var appleMapsAlertMessage = ""
     
     // 保存確認狀態
     @State private var saveSuccessMessage = ""
@@ -108,7 +110,6 @@ struct RouteResultsView: View {
                     
                     // 操作按鈕
                     ActionButtonsView(
-                        isNavigating: $isNavigating,
                         showShareSheet: $showShareSheet,
                         showSaveConfirmation: $showSaveConfirmation,
                         isSaved: $isSaved,
@@ -158,15 +159,24 @@ struct RouteResultsView: View {
                     RouteDetailsFullView(route: route)
                 }
             }
+            .sheet(isPresented: $showNavigationOptions) {
+                NavigationOptionsSheet(
+                    onSelectOption: { option in
+                        handleNavigationOption(option)
+                    },
+                    onDismiss: {
+                        showNavigationOptions = false
+                    }
+                )
+            }
+            .alert(isPresented: $showAppleMapsAlert) {
+                Alert(
+                    title: Text("提示"),
+                    message: Text(appleMapsAlertMessage),
+                    dismissButton: .default(Text("確定"))
+                )
+            }
             .overlay {
-                if isNavigating {
-                    NavigationOverlay(
-                        progress: navigationProgress,
-                        remainingTime: remainingTime,
-                        onCancel: cancelNavigation
-                    )
-                }
-                
                 // 保存成功提示
                 if showSaveSuccess {
                     SaveSuccessOverlay(message: saveSuccessMessage)
@@ -185,9 +195,6 @@ struct RouteResultsView: View {
                     // 檢查是否已保存
                     isSaved = travelDataManager.isRouteSaved(firstRoute)
                 }
-                
-                // 初始化模擬數據
-                setupMockData()
             }
             .onChange(of: selectedRouteId) { newId in
                 if let route = routes.first(where: { $0.id == newId }) {
@@ -195,12 +202,6 @@ struct RouteResultsView: View {
                 }
             }
         }
-    }
-    
-    private func setupMockData() {
-        // 設置模擬導航進度
-        navigationProgress = 0.0
-        remainingTime = routes.first?.duration ?? 45
     }
     
     // MARK: - 保存路線功能
@@ -254,35 +255,307 @@ struct RouteResultsView: View {
         }
     }
     
+    // MARK: - 導航功能
+    
     private func startNavigation() {
-        withAnimation(.spring()) {
-            isNavigating = true
+        // 顯示導航選項
+        showNavigationOptions = true
+    }
+    
+    private func handleNavigationOption(_ option: NavigationOption) {
+        guard let route = selectedRoute else {
+            appleMapsAlertMessage = "請先選擇一條路線"
+            showAppleMapsAlert = true
+            return
         }
         
-        // 模擬導航進度
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            if navigationProgress < 1.0 {
-                withAnimation(.linear(duration: 1.0)) {
-                    navigationProgress += 0.01
-                    remainingTime -= 1
-                }
-            } else {
-                timer.invalidate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.spring()) {
-                        isNavigating = false
+        switch option {
+        case .appleMaps:
+            openInAppleMaps(route)
+        case .googleMaps:
+            openInGoogleMaps(route)
+        case .copyAddress:
+            copyRouteAddress(route)
+        }
+    }
+    
+    private func openInAppleMaps(_ route: TravelRoute) {
+        // 使用香港作為默認城市來補全地址
+        let startAddress = route.startLocation.address.isEmpty ?
+            "\(route.startLocation.name), 香港" : route.startLocation.address
+        let endAddress = route.endLocation.address.isEmpty ?
+            "\(route.endLocation.name), 香港" : route.endLocation.address
+        
+        let geocoder = CLGeocoder()
+        
+        // 首先地理編碼起點
+        geocoder.geocodeAddressString(startAddress) { startPlacemarks, startError in
+            if let startPlacemark = startPlacemarks?.first,
+               let startLocation = startPlacemark.location {
+                
+                // 然後地理編碼終點
+                geocoder.geocodeAddressString(endAddress) { endPlacemarks, endError in
+                    if let endPlacemark = endPlacemarks?.first,
+                       let endLocation = endPlacemark.location {
+                        
+                        // 創建地圖項目
+                        let startMapItem = MKMapItem(placemark: MKPlacemark(placemark: startPlacemark))
+                        startMapItem.name = route.startLocation.name
+                        
+                        let endMapItem = MKMapItem(placemark: MKPlacemark(placemark: endPlacemark))
+                        endMapItem.name = route.endLocation.name
+                        
+                        // 打開Apple Maps進行導航
+                        MKMapItem.openMaps(
+                            with: [startMapItem, endMapItem],
+                            launchOptions: [
+                                MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit,
+                                MKLaunchOptionsShowsTrafficKey: true,
+                                MKLaunchOptionsMapTypeKey: MKMapType.standard.rawValue
+                            ]
+                        )
+                    } else {
+                        // 如果地理編碼失敗，嘗試使用通用香港坐標
+                        self.openAppleMapsWithCoordinates(
+                            startName: route.startLocation.name,
+                            endName: route.endLocation.name,
+                            startCoordinate: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694), // 中環
+                            endCoordinate: CLLocationCoordinate2D(latitude: 22.3027, longitude: 114.1772)    // 尖沙咀
+                        )
                     }
                 }
+            } else {
+                // 如果地理編碼失敗，嘗試使用通用香港坐標
+                self.openAppleMapsWithCoordinates(
+                    startName: route.startLocation.name,
+                    endName: route.endLocation.name,
+                    startCoordinate: CLLocationCoordinate2D(latitude: 22.3193, longitude: 114.1694),
+                    endCoordinate: CLLocationCoordinate2D(latitude: 22.3027, longitude: 114.1772)
+                )
             }
         }
     }
     
-    private func cancelNavigation() {
-        withAnimation(.spring()) {
-            isNavigating = false
-            navigationProgress = 0.0
-            remainingTime = routes.first?.duration ?? 45
+    private func openAppleMapsWithCoordinates(
+        startName: String,
+        endName: String,
+        startCoordinate: CLLocationCoordinate2D,
+        endCoordinate: CLLocationCoordinate2D
+    ) {
+        let startPlacemark = MKPlacemark(coordinate: startCoordinate)
+        let endPlacemark = MKPlacemark(coordinate: endCoordinate)
+        
+        let startMapItem = MKMapItem(placemark: startPlacemark)
+        startMapItem.name = startName
+        
+        let endMapItem = MKMapItem(placemark: endPlacemark)
+        endMapItem.name = endName
+        
+        MKMapItem.openMaps(
+            with: [startMapItem, endMapItem],
+            launchOptions: [
+                MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit,
+                MKLaunchOptionsShowsTrafficKey: true
+            ]
+        )
+    }
+    
+    private func openInGoogleMaps(_ route: TravelRoute) {
+        // 構建Google Maps URL
+        let startName = route.startLocation.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let endName = route.endLocation.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        
+        let urlString = "https://www.google.com/maps/dir/?api=1&origin=\(startName)&destination=\(endName)&travelmode=transit"
+        
+        if let url = URL(string: urlString) {
+            if UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            } else {
+                // 如果無法打開Google Maps，提示用戶安裝
+                appleMapsAlertMessage = "請安裝Google Maps應用程式或使用Apple Maps"
+                showAppleMapsAlert = true
+            }
         }
+    }
+    
+    private func copyRouteAddress(_ route: TravelRoute) {
+        let startAddress = route.startLocation.address.isEmpty ?
+            "\(route.startLocation.name), 香港" : route.startLocation.address
+        let endAddress = route.endLocation.address.isEmpty ?
+            "\(route.endLocation.name), 香港" : route.endLocation.address
+        
+        let routeText = """
+        出發地點: \(route.startLocation.name)
+        地址: \(startAddress)
+        
+        目的地: \(route.endLocation.name)
+        地址: \(endAddress)
+        
+        預計時間: \(route.duration)分鐘
+        出發時間: \(formatDate(route.departureTime))
+        
+        路線步驟:
+        \(route.steps.map { "• \($0.instruction) (\($0.duration)分鐘)" }.joined(separator: "\n"))
+        """
+        
+        UIPasteboard.general.string = routeText
+        
+        // 顯示複製成功提示
+        saveSuccessMessage = "路線地址已複製到剪貼簿"
+        withAnimation(.spring()) {
+            showSaveSuccess = true
+        }
+        
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation(.easeOut) {
+                showSaveSuccess = false
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - 導航選項枚舉
+enum NavigationOption {
+    case appleMaps
+    case googleMaps
+    case copyAddress
+}
+
+// MARK: - 導航選項表單
+struct NavigationOptionsSheet: View {
+    let onSelectOption: (NavigationOption) -> Void
+    let onDismiss: () -> Void
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("選擇導航方式")
+                .font(.headline)
+                .padding(.top, 20)
+            
+            VStack(spacing: 16) {
+                // Apple Maps 選項
+                Button(action: {
+                    onSelectOption(.appleMaps)
+                    presentationMode.wrappedValue.dismiss()
+                    onDismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "map.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                            .frame(width: 44, height: 44)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Apple 地圖")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text("使用系統地圖導航")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // Google Maps 選項
+                Button(action: {
+                    onSelectOption(.googleMaps)
+                    presentationMode.wrappedValue.dismiss()
+                    onDismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "g.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.green)
+                            .frame(width: 44, height: 44)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(10)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Google 地圖")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text("使用 Google 地圖導航")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // 複製地址選項
+                Button(action: {
+                    onSelectOption(.copyAddress)
+                    presentationMode.wrappedValue.dismiss()
+                    onDismiss()
+                }) {
+                    HStack {
+                        Image(systemName: "doc.on.doc.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                            .frame(width: 44, height: 44)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(10)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("複製地址")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text("複製起點和終點地址")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
+            
+            Spacer()
+            
+            Button("取消") {
+                presentationMode.wrappedValue.dismiss()
+                onDismiss()
+            }
+            .font(.headline)
+            .foregroundColor(.gray)
+            .padding(.bottom, 30)
+        }
+        .padding(.top, 20)
+        .background(Color(.systemBackground))
     }
 }
 
@@ -995,7 +1268,6 @@ struct WeatherImpactCard: View {
 
 // MARK: - 操作按鈕視圖
 struct ActionButtonsView: View {
-    @Binding var isNavigating: Bool
     @Binding var showShareSheet: Bool
     @Binding var showSaveConfirmation: Bool
     @Binding var isSaved: Bool
@@ -1006,22 +1278,12 @@ struct ActionButtonsView: View {
     var body: some View {
         VStack(spacing: 12) {
             // 導航按鈕
-            Button(action: {
-                if !isNavigating {
-                    onNavigate()
-                }
-            }) {
+            Button(action: onNavigate) {
                 HStack {
-                    if isNavigating {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "play.fill")
-                            .font(.headline)
-                    }
+                    Image(systemName: "location.fill")
+                        .font(.headline)
                     
-                    Text(isNavigating ? "導航中..." : "開始導航")
+                    Text("開始導航")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
@@ -1107,83 +1369,6 @@ struct ActionButtonsView: View {
                 .cornerRadius(8)
                 .transition(.opacity)
             }
-        }
-    }
-}
-
-// MARK: - 導航覆蓋層
-struct NavigationOverlay: View {
-    let progress: Double
-    let remainingTime: Int
-    let onCancel: () -> Void
-    
-    var body: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 24) {
-                // 進度環
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 8)
-                        .frame(width: 120, height: 120)
-                    
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            LinearGradient(
-                                gradient: Gradient(colors: [.green, .blue]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                        )
-                        .frame(width: 120, height: 120)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.linear(duration: 1.0), value: progress)
-                    
-                    VStack(spacing: 4) {
-                        Text("\(remainingTime)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        Text("分鐘")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                }
-                
-                // 導航信息
-                VStack(spacing: 8) {
-                    Text("導航進行中")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("請按照指示前進")
-                        .font(.body)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                
-                // 取消按鈕
-                Button(action: onCancel) {
-                    Text("取消導航")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 12)
-                        .background(Color.red.opacity(0.3))
-                        .cornerRadius(10)
-                }
-            }
-            .padding(40)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemBackground).opacity(0.9))
-            )
-            .padding(40)
         }
     }
 }
