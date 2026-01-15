@@ -10,11 +10,9 @@ import SwiftUI
 
 @main
 struct HKTravelMapApp: App {
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(isDarkMode ? .dark : .light)
                 .onAppear {
                     // 啟動時加載天氣
                     TravelDataManager.shared.fetchRealTimeWeather()
