@@ -10,9 +10,22 @@
 		8CEF4E772F0EF9DE00F04D31 /* HKTravelMap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HKTravelMap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8CA74DD02F189E77002732AA /* Exceptions for "HKTravelMap" folder in "HKTravelMap" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8C802C242F0D864D0092FA32 /* HKTravelMap */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8C802C272F0D864D0092FA32 /* HKTravelMap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8CA74DD02F189E77002732AA /* Exceptions for "HKTravelMap" folder in "HKTravelMap" target */,
+			);
 			path = HKTravelMap;
 			sourceTree = "<group>";
 		};
@@ -245,6 +258,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HKTravelMap/Info.plist;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "此應用需要您的位置以提供後台路線更新服務";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "此應用需要您的位置以提供路線規劃和地圖顯示功能";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -278,6 +292,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HKTravelMap/Info.plist;
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "此應用需要您的位置以提供後台路線更新服務";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "此應用需要您的位置以提供路線規劃和地圖顯示功能";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

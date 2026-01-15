@@ -789,11 +789,6 @@ struct RecentSearchesSection: View {
                 
                 Spacer()
                 
-                Button("查看全部") {
-                    showHistoryView = true
-                }
-                .font(.caption)
-                .foregroundColor(.hkBlue)
                 
                 // 清除歷史按鈕
                 if !travelDataManager.recentRoutes.isEmpty {

@@ -40,6 +40,30 @@ struct TravelRoute: Identifiable, Codable {
     var steps: [RouteStep]
     var weatherImpact: String?
     var notes: String?
+    var savedDate: Date? // 新增：保存日期
+    
+    // 添加默认值，兼容旧数据
+    init(startLocation: Location,
+         endLocation: Location,
+         departureTime: Date,
+         estimatedArrivalTime: Date,
+         duration: Int,
+         transportationModes: [String],
+         steps: [RouteStep],
+         weatherImpact: String? = nil,
+         notes: String? = nil,
+         savedDate: Date? = nil) {
+        self.startLocation = startLocation
+        self.endLocation = endLocation
+        self.departureTime = departureTime
+        self.estimatedArrivalTime = estimatedArrivalTime
+        self.duration = duration
+        self.transportationModes = transportationModes
+        self.steps = steps
+        self.weatherImpact = weatherImpact
+        self.notes = notes
+        self.savedDate = savedDate
+    }
 }
 
 struct RouteStep: Identifiable, Codable {
@@ -357,7 +381,8 @@ class TravelDataManager: ObservableObject {
                     )
                 ],
                 weatherImpact: "Good weather, recommended walking",
-                notes: "Avoid rush hours"
+                notes: "Avoid rush hours",
+                savedDate: Date().addingTimeInterval(-86400) // 昨天
             ),
             TravelRoute(
                 startLocation: Location(
@@ -410,7 +435,8 @@ class TravelDataManager: ObservableObject {
                     )
                 ],
                 weatherImpact: "Light rain expected, bring umbrella",
-                notes: "Use Octopus card for discount"
+                notes: "Use Octopus card for discount",
+                savedDate: Date().addingTimeInterval(-172800) // 前天
             )
         ]
     }
@@ -499,12 +525,16 @@ class TravelDataManager: ObservableObject {
     
     /// 添加路線到已保存列表
     func addSavedRoute(_ route: TravelRoute) {
+        // 創建帶有保存日期的新路線
+        var routeWithDate = route
+        routeWithDate.savedDate = Date()
+        
         // 檢查是否已經保存過（根據起點和終點名稱判斷）
         if !savedRoutes.contains(where: {
             $0.startLocation.name == route.startLocation.name &&
             $0.endLocation.name == route.endLocation.name
         }) {
-            savedRoutes.insert(route, at: 0)
+            savedRoutes.insert(routeWithDate, at: 0)
             saveSavedRoutes()
             objectWillChange.send()
             print("✅ 路線已保存: \(route.startLocation.name) → \(route.endLocation.name)")
@@ -585,7 +615,8 @@ class TravelDataManager: ObservableObject {
                     )
                 ],
                 weatherImpact: "Light rain expected, bring umbrella",
-                notes: "Use Octopus card for convenience"
+                notes: "Use Octopus card for convenience",
+                savedDate: Date()
             )
         ]
     }
