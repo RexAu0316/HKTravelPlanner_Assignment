@@ -10,7 +10,7 @@ import SwiftUI
 
 @main
 struct HKTravelMapApp: App {
-    @AppStorage("isDarkMode") private var isDarkMode = false
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
